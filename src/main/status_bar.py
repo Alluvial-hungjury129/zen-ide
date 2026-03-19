@@ -198,6 +198,7 @@ class StatusBar(Gtk.Box):
         self._error_label = Gtk.Label(label="")
         self._error_label.add_css_class("status-diagnostics-text")
         self._error_label.set_use_markup(True)
+        self._error_label.set_margin_end(6)
         self._diagnostics_box.append(self._error_label)
 
         self._warning_label = Gtk.Label(label="")
@@ -244,6 +245,7 @@ class StatusBar(Gtk.Box):
         self._filetype_icon = Gtk.Label(label="")  # File icon placeholder
         self._filetype_icon.add_css_class("status-filetype-icon")
         self._filetype_icon.set_valign(Gtk.Align.CENTER)
+        self._filetype_icon.set_margin_end(4)
         self._filetype_box.append(self._filetype_icon)
 
         self._filetype_label = Gtk.Label(label="")
@@ -354,7 +356,7 @@ class StatusBar(Gtk.Box):
 
             .status-encoding {{
                 background-color: {right_bg};
-                padding: 3px 0px;
+                padding: 3px 6px;
                 font-family: {icon_fallback};
                 font-size: {font_size}pt;
             }}
@@ -364,7 +366,7 @@ class StatusBar(Gtk.Box):
 
             .status-diagnostics {{
                 background-color: {right_bg};
-                padding: 3px 0px;
+                padding: 3px 6px;
                 font-family: {icon_fallback};
                 font-size: {font_size}pt;
             }}
@@ -374,7 +376,7 @@ class StatusBar(Gtk.Box):
 
             .status-modified {{
                 background-color: {right_bg};
-                padding: 3px 0px;
+                padding: 3px 6px;
                 font-family: {icon_fallback};
                 font-size: {font_size}pt;
             }}
@@ -384,7 +386,7 @@ class StatusBar(Gtk.Box):
 
             .status-filetype {{
                 background-color: {right_bg};
-                padding: 3px 0px;
+                padding: 3px 6px;
                 font-family: {icon_fallback};
                 font-size: {font_size}pt;
             }}
