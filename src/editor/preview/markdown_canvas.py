@@ -444,6 +444,8 @@ class MarkdownCanvas(Gtk.DrawingArea):
             self._draw_hr(snapshot, block, width)
         elif block.kind == "image":
             self._draw_image(snapshot, pango_ctx, block, width)
+        elif block.kind == "image_row":
+            self._draw_image_row(snapshot, pango_ctx, block, width)
 
     def _draw_heading(self, snapshot, pango_ctx, block: ContentBlock, width: float):
         scale = self.HEADING_SCALES.get(block.level, 1.0)
@@ -774,6 +776,11 @@ class MarkdownCanvas(Gtk.DrawingArea):
         texture = self._load_texture(block.image_url)
         content_width = width - self.PAD_LEFT - self.PAD_RIGHT
 
+        # Apply percentage width constraint if specified (e.g. width="50%")
+        effective_max_width = content_width
+        if block.image_width_pct is not None and 0 < block.image_width_pct < 100:
+            effective_max_width = content_width * (block.image_width_pct / 100.0)
+
         if texture is None:
             # Fallback: draw alt text placeholder
             desc = self._scaled_font_desc()
@@ -798,13 +805,20 @@ class MarkdownCanvas(Gtk.DrawingArea):
         display_w, display_h = self._fit_image_size(
             img_w,
             img_h,
-            content_width,
+            effective_max_width,
             explicit_w=block.image_width,
             explicit_h=block.image_height,
         )
 
+        # Compute X offset for alignment
+        img_x = float(self.PAD_LEFT)
+        if block.image_align == "center" and display_w < content_width:
+            img_x = self.PAD_LEFT + (content_width - display_w) / 2
+        elif block.image_align == "right" and display_w < content_width:
+            img_x = self.PAD_LEFT + content_width - display_w
+
         rect = Graphene.Rect()
-        rect.init(self.PAD_LEFT, block._y_offset, display_w, display_h)
+        rect.init(img_x, block._y_offset, display_w, display_h)
         snapshot.append_texture(texture, rect)
 
         # Draw alt text caption below image if present
@@ -819,12 +833,78 @@ class MarkdownCanvas(Gtk.DrawingArea):
             layout.set_wrap(Pango.WrapMode.WORD_CHAR)
             layout.set_text(block.image_alt, -1)
 
+            # Center caption under image if image is centered
+            cap_x = float(self.PAD_LEFT)
+            if block.image_align == "center":
+                _, cap_logical = layout.get_pixel_extents()
+                cap_x = self.PAD_LEFT + (content_width - cap_logical.width) / 2
+
             point = Graphene.Point()
-            point.init(self.PAD_LEFT, block._y_offset + display_h + 4)
+            point.init(cap_x, block._y_offset + display_h + 4)
             snapshot.save()
             snapshot.translate(point)
             snapshot.append_layout(layout, self._dim_rgba)
             snapshot.restore()
+
+    def _draw_image_row(self, snapshot, pango_ctx, block: ContentBlock, width: float):
+        """Draw multiple images side-by-side in a single row.
+
+        Each image gets an equal share of the available content width (minus
+        gaps). Images are scaled proportionally to fit their slot and
+        vertically centred within the row height.
+        """
+        _IMAGE_ROW_GAP = 8
+        content_width = width - self.PAD_LEFT - self.PAD_RIGHT
+        images = block.images
+        n = len(images)
+        if n == 0:
+            return
+
+        total_gap = _IMAGE_ROW_GAP * (n - 1)
+        slot_w = max((content_width - total_gap) / n, 20)
+
+        x = float(self.PAD_LEFT)
+        row_h = block._height
+
+        for img in images:
+            texture = self._load_texture(img["url"])
+            if texture is None:
+                # Fallback: draw placeholder text
+                desc = self._scaled_font_desc()
+                desc.set_style(Pango.Style.ITALIC)
+                layout = Pango.Layout.new(pango_ctx)
+                layout.set_font_description(desc)
+                layout.set_width(int(slot_w * Pango.SCALE))
+                layout.set_wrap(Pango.WrapMode.WORD_CHAR)
+                label = f"[image: {img.get('alt', '')}]" if img.get("alt") else "[image]"
+                layout.set_text(label, -1)
+
+                point = Graphene.Point()
+                point.init(x, block._y_offset)
+                snapshot.save()
+                snapshot.translate(point)
+                snapshot.append_layout(layout, self._dim_rgba)
+                snapshot.restore()
+
+                x += slot_w + _IMAGE_ROW_GAP
+                continue
+
+            iw = texture.get_width()
+            ih = texture.get_height()
+            dw, dh = self._fit_image_size(
+                iw, ih, slot_w,
+                explicit_w=img.get("width"),
+                explicit_h=img.get("height"),
+            )
+
+            # Vertically centre within the row
+            y_off = block._y_offset + max(0, (row_h - dh) / 2)
+
+            rect = Graphene.Rect()
+            rect.init(x, y_off, dw, dh)
+            snapshot.append_texture(texture, rect)
+
+            x += slot_w + _IMAGE_ROW_GAP
 
     def _draw_collapsible(
         self, snapshot, pango_ctx, block: ContentBlock, width: float, scroll_y: float = 0.0, visible_height: float = 1e9
@@ -1164,6 +1244,8 @@ class MarkdownCanvas(Gtk.DrawingArea):
             return 16
         elif block.kind == "image":
             return self._measure_image(pango_ctx, block, content_width)
+        elif block.kind == "image_row":
+            return self._measure_image_row(pango_ctx, block, content_width)
         return self._line_height
 
     def _measure_heading(self, pango_ctx, block: ContentBlock, content_width: float) -> float:
@@ -1403,12 +1485,17 @@ class MarkdownCanvas(Gtk.DrawingArea):
             # Fallback placeholder height
             return self._line_height + 4
 
+        # Apply percentage width constraint if specified (e.g. width="50%")
+        effective_max_width = content_width
+        if block.image_width_pct is not None and 0 < block.image_width_pct < 100:
+            effective_max_width = content_width * (block.image_width_pct / 100.0)
+
         img_w = texture.get_width()
         img_h = texture.get_height()
         _, display_h = self._fit_image_size(
             img_w,
             img_h,
-            content_width,
+            effective_max_width,
             explicit_w=block.image_width,
             explicit_h=block.image_height,
         )
@@ -1428,6 +1515,40 @@ class MarkdownCanvas(Gtk.DrawingArea):
             caption_h = logical.height + 4
 
         return display_h + caption_h
+
+    def _measure_image_row(self, pango_ctx, block: ContentBlock, content_width: float) -> float:
+        """Measure a row of images laid out side-by-side.
+
+        Images share the available width equally (minus gaps). Each image is
+        scaled proportionally to fit its column, and the row height is the
+        tallest image. Falls back to a vertical stack if any image texture is
+        missing.
+        """
+        _IMAGE_ROW_GAP = 8  # horizontal gap between images
+
+        images = block.images
+        n = len(images)
+        if n == 0:
+            return self._line_height
+
+        # Load all textures; if any fail we fall back to placeholder height
+        textures = [self._load_texture(img["url"]) for img in images]
+
+        max_h = 0.0
+        # Compute the slot width for each image
+        total_gap = _IMAGE_ROW_GAP * (n - 1)
+        slot_w = max((content_width - total_gap) / n, 20)
+
+        for i, (img, tex) in enumerate(zip(images, textures)):
+            if tex is None:
+                max_h = max(max_h, self._line_height + 4)
+                continue
+            iw = tex.get_width()
+            ih = tex.get_height()
+            _, dh = self._fit_image_size(iw, ih, slot_w, explicit_w=img.get("width"), explicit_h=img.get("height"))
+            max_h = max(max_h, dh)
+
+        return max_h
 
     # ------------------------------------------------------------------ #
     #  Text extraction                                                     #
@@ -1458,6 +1579,8 @@ class MarkdownCanvas(Gtk.DrawingArea):
             return "---"
         elif block.kind == "image":
             return f"![{block.image_alt}]({block.image_url})"
+        elif block.kind == "image_row":
+            return " ".join(f"![{img.get('alt', '')}]({img['url']})" for img in block.images)
         return ""
 
     # ------------------------------------------------------------------ #

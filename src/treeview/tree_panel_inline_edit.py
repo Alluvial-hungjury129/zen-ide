@@ -7,7 +7,7 @@ from typing import Callable, Optional
 from gi.repository import Gdk, GLib, Gtk
 
 from themes import get_theme
-from zen_entry import ZenEntry
+from shared.ui.zen_entry import ZenEntry
 
 
 class TreePanelInlineEditMixin:

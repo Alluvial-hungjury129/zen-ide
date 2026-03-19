@@ -10,7 +10,7 @@ from gi.repository import Gdk, Gtk, Pango
 
 from shared.settings import get_setting
 from shared.ui import ZenButton
-from zen_entry import ZenEntry, ZenSearchEntry
+from shared.ui.zen_entry import ZenEntry, ZenSearchEntry
 
 
 def is_nvim_mode() -> bool:

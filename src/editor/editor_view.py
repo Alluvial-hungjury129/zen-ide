@@ -24,7 +24,7 @@ from shared.focus_manager import get_component_focus_manager
 from shared.settings import get_setting
 from shared.ui import ZenButton
 from themes import get_theme, subscribe_theme_change
-from zen_entry import ZenEntry, ZenSearchEntry
+from shared.ui.zen_entry import ZenEntry, ZenSearchEntry
 
 from .color_preview_renderer import ColorPreviewRenderer
 from .semantic_highlight import setup_semantic_highlight, update_semantic_colors

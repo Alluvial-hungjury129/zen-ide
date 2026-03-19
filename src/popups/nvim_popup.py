@@ -1161,7 +1161,7 @@ class NvimPopup(Gtk.Window):
         Returns:
             A styled ZenEntry (Gtk.Entry subclass)
         """
-        from zen_entry import ZenEntry
+        from shared.ui.zen_entry import ZenEntry
 
         entry = ZenEntry(placeholder=placeholder, initial_value=initial_value)
         entry.add_css_class("nvim-popup-input")
@@ -1177,7 +1177,7 @@ class NvimPopup(Gtk.Window):
         Returns:
             A styled ZenSearchEntry (Gtk.SearchEntry subclass)
         """
-        from zen_entry import ZenSearchEntry
+        from shared.ui.zen_entry import ZenSearchEntry
 
         entry = ZenSearchEntry(placeholder=placeholder)
         entry.add_css_class("nvim-popup-search")

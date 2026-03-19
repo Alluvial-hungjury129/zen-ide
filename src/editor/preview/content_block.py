@@ -32,6 +32,9 @@ class ContentBlock:
     - ``table``:      headers, rows
     - ``list``:       items, ordered
     - ``blockquote``: children
+    - ``image``:      image_url, image_alt, image_width, image_height,
+                      image_width_pct, image_align
+    - ``image_row``:  images (list of dicts, laid out horizontally)
     - ``hr``:         (no extra fields)
     """
 
@@ -70,11 +73,17 @@ class ContentBlock:
     badge_color: str = ""  # hex background for badge
     border_color: str = ""  # colored left border on collapsible cards
 
-    # image
+    # image (single)
     image_url: str = ""
     image_alt: str = ""
     image_width: int | None = None
     image_height: int | None = None
+    image_width_pct: float | None = None  # percentage width (e.g. 50 for "50%")
+    image_align: str = ""  # "center", "left", "right" — from HTML align attr
+
+    # image_row (multiple images side-by-side)
+    # Each entry: {"url": str, "alt": str, "width": int|None, "height": int|None}
+    images: list[dict] = field(default_factory=list)
 
     # rendering cache (filled by MarkdownCanvas)
     _y_offset: float = 0.0

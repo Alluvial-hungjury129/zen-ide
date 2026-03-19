@@ -1,8 +1,20 @@
 # Zen IDE
 
 <img src="zen_icon.png" width="64" height="64"/>
-A minimalist and opinionated IDE built with Python and [GTK4](https://gitlab.gnome.org/GNOME/gtk/).
+A minimalist and opinionated IDE built with Python and [GTK4](https://gitlab.gnome.org/GNOME/gtk).
 
+
+## Screenshots
+
+<table>
+  <tr>
+    <td colspan="2"><img src="screenshots/splash1.png" width="100%"/></td>
+  </tr>
+  <tr>
+    <td><img src="screenshots/splash2.png"/></td>
+    <td><img src="screenshots/splash3.png"/></td>
+  </tr>
+</table>
 
 ## Features
 
