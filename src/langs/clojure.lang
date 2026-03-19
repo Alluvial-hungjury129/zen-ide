@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Clojure syntax highlighting for GtkSourceView 5.
+  Covers Clojure (.clj), ClojureScript (.cljs), and Clojure Common (.cljc).
+-->
+<language id="clojure" name="Clojure" version="2.0" _section="Source">
+
+  <metadata>
+    <property name="mimetypes">text/x-clojure</property>
+    <property name="globs">*.clj;*.cljs;*.cljc;*.edn</property>
+    <property name="line-comment-start">;</property>
+    <property name="block-comment-start">#_</property>
+  </metadata>
+
+  <styles>
+    <style id="comment"        name="Comment"        map-to="def:comment"/>
+    <style id="string"         name="String"         map-to="def:string"/>
+    <style id="regex"          name="Regex"          map-to="def:string"/>
+    <style id="keyword"        name="Keyword"        map-to="def:keyword"/>
+    <style id="special-form"   name="Special Form"   map-to="def:keyword"/>
+    <style id="builtin"        name="Built-in"       map-to="def:builtin"/>
+    <style id="boolean"        name="Boolean"        map-to="def:boolean"/>
+    <style id="nil"            name="Nil"            map-to="def:special-constant"/>
+    <style id="number"         name="Number"         map-to="def:number"/>
+    <style id="character"      name="Character"      map-to="def:character"/>
+    <style id="clojure-keyword" name="Clojure Keyword" map-to="def:type"/>
+    <style id="symbol"         name="Symbol"         map-to="def:identifier"/>
+    <style id="function"       name="Function"       map-to="def:function"/>
+    <style id="macro"          name="Macro"          map-to="def:preprocessor"/>
+    <style id="reader-macro"   name="Reader Macro"   map-to="def:preprocessor"/>
+    <style id="metadata"       name="Metadata"       map-to="def:preprocessor"/>
+    <style id="error"          name="Error"          map-to="def:error"/>
+  </styles>
+
+  <definitions>
+
+    <!-- Line comments: ; to end of line -->
+    <context id="line-comment" style-ref="comment" end-at-line-end="true" class="comment" class-disabled="no-spell-check">
+      <start>;</start>
+      <include>
+        <context ref="def:in-comment"/>
+      </include>
+    </context>
+
+    <!-- Discard macro: #_ (highlight as comment) -->
+    <context id="discard-macro" style-ref="comment">
+      <match>#_</match>
+    </context>
+
+    <!-- Strings: "..." with escape sequences -->
+    <context id="string" style-ref="string" end-at-line-end="false" class="string" class-disabled="no-spell-check">
+      <start>"</start>
+      <end>"</end>
+      <include>
+        <context id="string-escape" style-ref="def:special-char">
+          <match>\\(?:[\\\"ntrbf]|u[0-9a-fA-F]{4}|[0-7]{1,3})</match>
+        </context>
+      </include>
+    </context>
+
+    <!-- Regex literals: #"..." -->
+    <context id="regex" style-ref="regex" end-at-line-end="false">
+      <start>#"</start>
+      <end>"</end>
+      <include>
+        <context id="regex-escape" style-ref="def:special-char">
+          <match>\\.</match>
+        </context>
+      </include>
+    </context>
+
+    <!-- Character literals: \newline, \space, \tab, \uXXXX, \X -->
+    <context id="character" style-ref="character">
+      <match>\\(?:newline|space|tab|return|backspace|formfeed|u[0-9a-fA-F]{4}|\S)</match>
+    </context>
+
+    <!-- Booleans -->
+    <context id="boolean" style-ref="boolean">
+      <match>(?&lt;=[\s\(\[\{])(?:true|false)(?=[\s\)\]\}\,])|^(?:true|false)$</match>
+    </context>
+
+    <!-- Nil -->
+    <context id="nil" style-ref="nil">
+      <match>(?&lt;=[\s\(\[\{])nil(?=[\s\)\]\}\,])|^nil$</match>
+    </context>
+
+    <!-- Numbers: integers, floats, ratios, hex, octal, radix, BigInt/BigDecimal -->
+    <context id="number" style-ref="number">
+      <match>(?&lt;=[\s\(\[\{])(?:[+-]?(?:0[xX][0-9a-fA-F]+|0[0-7]+|\d+[rR][0-9a-zA-Z]+|\d+(?:\.\d*)?(?:[eE][+-]?\d+)?[MN]?|\d+/\d+))(?=[\s\)\]\}\,])</match>
+    </context>
+
+    <!-- Clojure keywords: :keyword, ::keyword, :ns/keyword -->
+    <context id="clojure-keyword" style-ref="clojure-keyword">
+      <match>::?[a-zA-Z_\-\+\*\!\?\.\#][a-zA-Z0-9_\-\+\*\!\?\.\#]*(?:/[a-zA-Z_\-\+\*\!\?\.\#][a-zA-Z0-9_\-\+\*\!\?\.\#]*)?</match>
+    </context>
+
+    <!-- Reader macros and metadata -->
+    <context id="reader-macro" style-ref="reader-macro">
+      <match>#(?:'\{|'\(|'|inst|uuid|js|&lt;!|&gt;)</match>
+    </context>
+
+    <context id="metadata" style-ref="metadata">
+      <match>\^(?:\{|:?[a-zA-Z][\w\-\.\?]*)</match>
+    </context>
+
+    <!-- Special forms (core language constructs) -->
+    <context id="special-form" style-ref="special-form">
+      <match>(?&lt;=\()(?:def|if|do|let|quote|var|fn|loop|recur|throw|try|catch|finally|monitor-enter|monitor-exit|new|set!|\.)\b</match>
+    </context>
+
+    <!-- Definition forms (highlighted as function defs) -->
+    <context id="definition" style-ref="function">
+      <match>(?&lt;=\()(?:defn-?|defmacro|defmethod|defmulti|defonce|defprotocol|defrecord|defstruct|deftype|definline|definterface)(?=\s)</match>
+    </context>
+
+    <!-- Macros and core forms -->
+    <context id="macro" style-ref="macro">
+      <match>(?&lt;=\()(?:ns|in-ns|require|use|import|refer|refer-clojure|create-ns|find-ns|the-ns|remove-ns|alias)\b</match>
+    </context>
+
+    <!-- Core keywords / builtins -->
+    <context id="builtin" style-ref="builtin">
+      <match>(?&lt;=\()(?:when|when-not|when-let|when-first|when-some|if-not|if-let|if-some|cond|condp|case|and|or|not|do|doto|doseq|dotimes|dorun|doall|for|while|binding|with-open|with-out-str|with-in-str|with-local-vars|with-bindings|with-redefs|locking|lazy-seq|lazy-cat|delay|force|realized\?|future|promise|deliver|deref|atom|ref|agent|swap!|reset!|compare-and-set!|add-watch|remove-watch|send|send-off|await|await-for|dosync|ref-set|alter|commute|ensure|io!|assert|comment|declare|intern|gen-class|gen-interface|proxy|reify|extend|extend-type|extend-protocol|satisfies\?|instance\?|isa\?|type|class|supers|bases|ancestors|descendants|derive|underive|make-hierarchy|apply|comp|complement|constantly|identity|juxt|fnil|memoize|partial|every-pred|some-fn|map|mapv|map-indexed|filter|filterv|remove|reduce|reduce-kv|transduce|into|sequence|cat|mapcat|flatten|sort|sort-by|group-by|partition|partition-by|partition-all|take|take-while|take-nth|take-last|drop|drop-while|drop-last|first|second|last|rest|next|ffirst|nfirst|fnext|nnext|cons|conj|conjoin|assoc|assoc-in|dissoc|disj|get|get-in|update|update-in|select-keys|keys|vals|merge|merge-with|zipmap|count|empty\?|not-empty|seq|vec|vector|list|hash-map|sorted-map|sorted-map-by|hash-set|sorted-set|sorted-set-by|into-array|to-array|to-array-2d|aclone|amap|areduce|nth|peek|pop|subvec|rseq|reverse|str|subs|format|re-find|re-matches|re-pattern|re-seq|re-groups|name|namespace|symbol|keyword|gensym|print|println|pr|prn|printf|read|read-string|slurp|spit|line-seq|file-seq|xml-seq|tree-seq|iterate|repeat|range|cycle|interleave|interpose|concat|distinct|dedupe|frequencies|set|some|every\?|not-every\?|not-any\?|empty|contains\?|find|keep|keep-indexed|max|min|max-key|min-key|inc|dec|pos\?|neg\?|zero\?|even\?|odd\?|number\?|integer\?|float\?|rational\?|ratio\?|decimal\?|string\?|char\?|boolean\?|keyword\?|symbol\?|map\?|vector\?|list\?|set\?|seq\?|coll\?|fn\?|var\?|nil\?|true\?|false\?|identical\?|compare|rand|rand-int|rand-nth|shuffle|with-meta|meta|vary-meta|alter-meta!|reset-meta!)\b</match>
+    </context>
+
+    <!-- Threading macros -->
+    <context id="threading" style-ref="macro">
+      <match>(?&lt;=\()(?:-&gt;|-&gt;&gt;|as-&gt;|some-&gt;|some-&gt;&gt;|cond-&gt;|cond-&gt;&gt;)\b</match>
+    </context>
+
+    <!-- Java interop: .method, Class/staticMethod, Class. -->
+    <context id="java-interop" style-ref="builtin">
+      <match>(?&lt;=[\s\(])(?:\.[a-zA-Z][a-zA-Z0-9]*|[A-Z][a-zA-Z0-9]*(?:/[a-zA-Z][a-zA-Z0-9]*|\.))\b</match>
+    </context>
+
+    <!-- Anonymous function shorthand: #( -->
+    <context id="anon-fn" style-ref="reader-macro">
+      <match>#\(</match>
+    </context>
+
+    <!-- Var quote: #' -->
+    <context id="var-quote" style-ref="reader-macro">
+      <match>#'</match>
+    </context>
+
+    <!-- Deref: @ -->
+    <context id="deref" style-ref="keyword">
+      <match>@</match>
+    </context>
+
+    <!-- Quote / syntax-quote / unquote -->
+    <context id="quote" style-ref="reader-macro">
+      <match>[`'~]</match>
+    </context>
+
+    <!-- Unquote-splice -->
+    <context id="unquote-splice" style-ref="reader-macro">
+      <match>~@</match>
+    </context>
+
+    <!-- Tagged literals: #inst, #uuid, etc. -->
+    <context id="tagged-literal" style-ref="reader-macro">
+      <match>#[a-zA-Z][a-zA-Z0-9\.\-]*(?:/[a-zA-Z][a-zA-Z0-9\.\-]*)?</match>
+    </context>
+
+    <!-- Main context -->
+    <context id="clojure" class="no-spell-check">
+      <include>
+        <context ref="line-comment"/>
+        <context ref="discard-macro"/>
+        <context ref="string"/>
+        <context ref="regex"/>
+        <context ref="character"/>
+        <context ref="boolean"/>
+        <context ref="nil"/>
+        <context ref="number"/>
+        <context ref="clojure-keyword"/>
+        <context ref="unquote-splice"/>
+        <context ref="reader-macro"/>
+        <context ref="metadata"/>
+        <context ref="special-form"/>
+        <context ref="definition"/>
+        <context ref="macro"/>
+        <context ref="builtin"/>
+        <context ref="threading"/>
+        <context ref="anon-fn"/>
+        <context ref="var-quote"/>
+        <context ref="deref"/>
+        <context ref="quote"/>
+        <context ref="tagged-literal"/>
+      </include>
+    </context>
+
+  </definitions>
+</language>

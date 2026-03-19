@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Disable App Sandbox for full file system access -->
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+    
+    <!-- Allow read/write to user-selected files -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    
+    <!-- Allow read access to all files -->
+    <key>com.apple.security.files.all</key>
+    <true/>
+    
+    <!-- Allow AppleEvents (for activation) -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+</dict>
+</plist>

@@ -1,0 +1,70 @@
+"""Nyoom theme - based on nyoom.nvim / oxocarbon colorscheme by nyoom-engineering."""
+
+from themes.theme_model import Theme
+
+# Palette from oxocarbon.nvim (dark variant) with precise blend_hex values:
+# base00 = #161616  base01 = #2a2a2a  base02 = #404040  base03 = #5c5c5c
+# base04 = #d5d5d5  base05 = #f3f3f3  base06 = #ffffff
+# base07 = #08bdba  base08 = #3ddbd9  base09 = #78a9ff  base10 = #ee5396
+# base11 = #33b1ff  base12 = #ff7eb6  base13 = #42be65  base14 = #be95ff
+# base15 = #82cfff  blend  = #131313
+
+NYOOM = Theme(
+    name="nyoom",
+    display_name="Nyoom",
+    main_bg="#161616",
+    panel_bg="#2a2a2a",
+    fg_color="#d5d5d5",
+    fg_dim="#5c5c5c",
+    selection_bg="#404040",
+    hover_bg="#2a2a2a",
+    line_number_bg="#161616",
+    line_number_fg="#5c5c5c",
+    caret_fg="#f3f3f3",
+    indent_guide="#404040",
+    tab_bg="#161616",
+    tab_active_bg="#2a2a2a",
+    tab_fg="#5c5c5c",
+    tab_active_fg="#d5d5d5",
+    tree_bg="#161616",
+    tree_fg="#d5d5d5",
+    tree_selected_bg="#404040",
+    tree_modified_fg="#78a9ff",
+    tree_ignored_fg="#5c5c5c",
+    term_bg="#161616",
+    term_fg="#d5d5d5",
+    accent_color="#be95ff",
+    border_color="#2a2a2a",
+    border_focus="#be95ff",
+    sash_color="#161616",
+    term_cyan="#3ddbd9",
+    chat_user_fg="#3ddbd9",
+    chat_assistant_fg="#be95ff",
+    syntax_keyword="#78a9ff",
+    syntax_string="#be95ff",
+    syntax_comment="#5c5c5c",
+    syntax_number="#82cfff",
+    syntax_function="#3ddbd9",
+    syntax_class="#78a9ff",
+    syntax_operator="#78a9ff",
+    syntax_keyword_control="#78a9ff",
+    syntax_variable="#d5d5d5",
+    syntax_string_escape="#82cfff",
+    syntax_regex="#ee5396",
+    syntax_doc_comment="#5c5c5c",
+    syntax_constant="#82cfff",
+    syntax_boolean="#78a9ff",
+    term_black="#2a2a2a",
+    term_red="#ee5396",
+    term_green="#42be65",
+    term_yellow="#ff7eb6",
+    term_blue="#78a9ff",
+    term_magenta="#be95ff",
+    term_white="#d5d5d5",
+    git_added="#42be65",
+    git_modified="#78a9ff",
+    git_deleted="#ee5396",
+    search_match_bg="#404040",
+    search_current_bg="#33b1ff",
+    ai_processing_color="#be95ff",
+)
