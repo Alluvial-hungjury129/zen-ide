@@ -892,7 +892,9 @@ class MarkdownCanvas(Gtk.DrawingArea):
             iw = texture.get_width()
             ih = texture.get_height()
             dw, dh = self._fit_image_size(
-                iw, ih, slot_w,
+                iw,
+                ih,
+                slot_w,
                 explicit_w=img.get("width"),
                 explicit_h=img.get("height"),
             )

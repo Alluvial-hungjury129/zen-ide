@@ -759,9 +759,9 @@ class ChatCanvas(Gtk.DrawingArea):
 
             # --- Pass 1: backgrounds (merged adjacent same-color rects) ---
             x = float(self.PAD_LEFT)
-            run_bg = None   # current background hex or None
-            run_x = 0.0     # start x of current run
-            run_w = 0.0     # accumulated width of current run
+            run_bg = None  # current background hex or None
+            run_x = 0.0  # start x of current run
+            run_w = 0.0  # accumulated width of current run
             for ch, ch_w, si in row_cells:
                 bg = spans[si].bg
                 if bg == run_bg:

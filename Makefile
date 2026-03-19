@@ -40,11 +40,13 @@ startup-time: ## Measure startup time (opens and closes IDE)
 	$(COMPILE)
 	@cd src && $(RUN_ENV) ZEN_STARTUP_BENCH=1 $(IDE_CMD)
 
-lint: ## Run ruff linter and formatter
+lint: ## Run ruff linter and formatter (auto-fix)
 	uv run ruff check --fix && uv run ruff format
 
-test: tests
-tests: ## Run tests with pytest
+lint-check: ## Run ruff linter and formatter (check only, no changes)
+	uv run ruff check && uv run ruff format --check
+
+test: ## Run tests with pytest
 	uv run python -m pytest tests/ --color=yes
 
 # ── Installation ─────────────────────────────────────────────────────

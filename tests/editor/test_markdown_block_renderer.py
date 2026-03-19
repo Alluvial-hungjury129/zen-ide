@@ -6,6 +6,7 @@ import pytest
 @pytest.fixture
 def renderer():
     from editor.preview.markdown_block_renderer import MarkdownBlockRenderer
+
     return MarkdownBlockRenderer()
 
 

@@ -46,7 +46,9 @@ class MarkdownBlockRenderer:
         re.IGNORECASE,
     )
     # Paired close tag for the above
-    _HTML_BLOCK_CLOSE_RE = re.compile(r"</\s*(table|div|section|details|figure|picture|video|audio|iframe|center)\s*>", re.IGNORECASE)
+    _HTML_BLOCK_CLOSE_RE = re.compile(
+        r"</\s*(table|div|section|details|figure|picture|video|audio|iframe|center)\s*>", re.IGNORECASE
+    )
 
     def render(self, markdown_text: str) -> list[ContentBlock]:
         """Parse markdown text and return content blocks."""
@@ -522,13 +524,15 @@ class MarkdownBlockRenderer:
                                 height = int(height_raw) if height_raw and "%" not in str(height_raw) else None
                             except (ValueError, TypeError):
                                 pass
-                            row_imgs.append({
-                                "url": img.get("src", ""),
-                                "alt": img.get("alt", ""),
-                                "width": width,
-                                "height": height,
-                                "width_pct": width_pct,
-                            })
+                            row_imgs.append(
+                                {
+                                    "url": img.get("src", ""),
+                                    "alt": img.get("alt", ""),
+                                    "width": width,
+                                    "height": height,
+                                    "width_pct": width_pct,
+                                }
+                            )
 
                     if len(row_imgs) == 1:
                         # Single image row → plain image block
@@ -557,9 +561,7 @@ class MarkdownBlockRenderer:
             else:
                 # Text table — convert to a markdown-style table block.
                 # First row with <th> is the header; otherwise first row is header.
-                has_header = any(
-                    cell.get("is_header") for cell in parser.table_rows[0]
-                ) if parser.table_rows else False
+                has_header = any(cell.get("is_header") for cell in parser.table_rows[0]) if parser.table_rows else False
 
                 if has_header:
                     header_row = parser.table_rows[0]
