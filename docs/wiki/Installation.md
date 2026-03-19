@@ -4,8 +4,8 @@
 
 | Requirement | Minimum |
 |---|---|
-| Python | 3.13+ |
-| OS | macOS 12+ or Linux (X11/Wayland) |
+| Python | 3.14+ |
+| OS | macOS 13+ or Linux (X11/Wayland) |
 | GTK4 | 4.x (via Homebrew or apt) |
 | GtkSourceView | 5.x |
 | VTE | 0.70+ (terminal emulator) |
@@ -14,20 +14,30 @@
 
 ```bash
 # macOS
-make install-system-deps   # runs: brew install gtk4 gtksourceview5 libadwaita vte3 pygobject3
+make install-system-deps   # runs: brew install gtk4 gtksourceview5 vte3 libadwaita gobject-introspection pkg-config
 
 # Linux (Debian/Ubuntu)
-make install-system-deps   # runs: apt install libgtk-4-dev libgtksourceview-5-dev libvte-2.91-gtk4-dev
+make install-system-deps   # runs: apt install libgirepository1.0-dev python3-gi python3-gi-cairo
+                           #        gir1.2-gtk-4.0 gir1.2-gtksource-5 gir1.2-adw-1
+                           #        gir1.2-vte-3.91 gir1.2-webkit2-4.1
 ```
 
 ## Install Zen IDE
 
 ```bash
 # Clone and install
-git clone <repo-url> zen_ide
-cd zen_ide
-make install           # Install Python dependencies with uv
-make install-dev       # (optional) Install dev tools: pytest, ruff
+git clone https://github.com/4mux/zen-ide.git
+cd zen-ide
+
+# Option A: Install everything (system deps + venv + dev + build tools + CLI)
+make install
+
+# Option B: Step by step
+make install-system-deps   # System dependencies (GTK4 stack)
+make install-py            # Create venv and install Python dependencies with uv
+make install-dev           # (optional) Install dev tools: pytest, ruff
+make install-build         # (optional) Install build tools: pyinstaller, nuitka
+make install-cli           # (optional) Install the 'zen' CLI command
 ```
 
 ## Running
@@ -36,25 +46,32 @@ make install-dev       # (optional) Install dev tools: pytest, ruff
 make run               # Launch the IDE
 ```
 
-## Install the `code` CLI Command
+## Install the `zen` CLI Command
 
 Open Zen IDE from any terminal:
 
 ```bash
-make install-cli       # Installs the `code` command to your PATH
+make install-cli       # Symlinks the 'zen' command to ~/.local/bin/
 ```
 
 Then from any terminal:
 
 ```bash
-code .                 # Open current directory in Zen IDE
-code myfile.py         # Open a specific file
+zen .                  # Open current directory in Zen IDE
+zen myfile.py          # Open a specific file
 ```
+
+> **Note:** Make sure `~/.local/bin` is in your `PATH`. If it isn't, add this to your shell profile:
+> ```bash
+> export PATH="$HOME/.local/bin:$PATH"
+> ```
 
 ## Linux Desktop Entry
 
+On Linux, `make dist` installs a `.desktop` file and icon for app launchers:
+
 ```bash
-make install-desktop   # Install .desktop file and icon for app launchers
+make dist              # Install .desktop file and icon (~/.local/share/applications/)
 ```
 
 ## First Launch
@@ -72,5 +89,5 @@ On first launch, Zen IDE will:
 
 ```bash
 make install-build     # Install PyInstaller/Nuitka
-make dist              # Build .app bundle in dist/
+make dist              # Build .app bundle, sign it, and install to /Applications
 ```

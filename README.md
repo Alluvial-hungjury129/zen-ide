@@ -27,7 +27,7 @@ A minimalist and opinionated IDE built with Python and [GTK4](https://gitlab.gno
 - **Terminal** — VTE with 256-color support, file path linking, shell aliases, workspace folder picker
 - **Dev Pad** (`Cmd+.`) — Activity tracking, notes, quick resume links
 - **Sketch Pad** (`Cmd+Shift+D`) — ASCII/Unicode diagram editor, opens `.zen_sketch` files in editor with box-drawing shapes, arrows, export to PNG
-- **36 Themes** — Zen Dark/Light, Dracula, Gruvbox, Tokyo Night, Catppuccin, and more
+- **38 Themes** — Zen Dark/Light, Dracula, Gruvbox, Tokyo Night, Catppuccin, and more
 - **Vim-Style UI** — Neovim-style floating popups, j/k navigation, context menus
 - **Session Restore** — Reopens last files, layout, and panel positions on startup
 
@@ -41,9 +41,9 @@ make run       # launch Zen IDE
 After install you can also open Zen from any terminal:
 
 ```bash
-zen .                   # open current directory
-zen file.py             # open a file
-zen ~/projects/my-app   # open a workspace
+zen .                                 # open current directory
+zen file.py                           # open a file
+zen ~/projects/my-app.zen-workspace   # open a workspace
 ```
 
 > If `~/.local/bin` is not in your PATH, add it:
@@ -58,7 +58,7 @@ zen ~/projects/my-app   # open a workspace
 
 ### Requirements
 
-- Python 3.12+, [uv](https://docs.astral.sh/uv/), macOS (Homebrew)
+- Python 3.14+, [uv](https://docs.astral.sh/uv/), macOS (Homebrew)
 
 ## Supported Languages
 
