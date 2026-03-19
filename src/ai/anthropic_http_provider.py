@@ -12,11 +12,19 @@ API key resolution order:
 
 import json
 import os
+import socket
 import threading
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Callable, Optional
+
+# Read timeout for individual socket reads (seconds).
+# This prevents the stream from hanging forever if the server stops sending data.
+# The watchdog in ai_chat_terminal.py will cancel after _STALE_REQUEST_TIMEOUT_S (90s)
+# but this timeout ensures the blocking read eventually returns so the thread can check
+# _stop_requested and exit cleanly.
+_SOCKET_READ_TIMEOUT_S = 30
 
 _API_KEYS_PATH = Path.home() / ".zen_ide" / "api_keys.json"
 _MESSAGES_URL = "https://api.anthropic.com/v1/messages"
@@ -256,11 +264,37 @@ class AnthropicHTTPProvider:
                 )
 
                 self._current_response = urllib.request.urlopen(req, timeout=300)
+                
+                # Set socket-level read timeout to prevent blocking forever.
+                # The urlopen timeout only covers the connection handshake.
+                # This ensures individual read() calls will time out, allowing
+                # the loop to check _stop_requested periodically.
+                try:
+                    sock = self._current_response.fp.raw._sock
+                    sock.settimeout(_SOCKET_READ_TIMEOUT_S)
+                except Exception:
+                    pass  # Socket access may fail on some platforms; continue anyway
+                
                 buffer = ""
                 stop_reason = None
 
-                for raw_line in self._current_response:
+                while True:
                     if self._stop_requested:
+                        break
+                    
+                    try:
+                        raw_line = self._current_response.readline()
+                    except socket.timeout:
+                        # Socket read timed out — check if we should stop
+                        if self._stop_requested:
+                            break
+                        continue  # Keep waiting for data
+                    except OSError:
+                        # Connection closed or broken
+                        break
+                    
+                    if not raw_line:
+                        # End of stream
                         break
 
                     line = raw_line.decode("utf-8", errors="replace")

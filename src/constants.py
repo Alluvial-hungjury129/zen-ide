@@ -131,7 +131,7 @@ AUTOCOMPLETE_AUTO_TRIGGER_DELAY_MS = 150  # debounce delay for auto-trigger (ms)
 
 # Status Bar
 STATUS_BAR_HORIZONTAL_PADDING = 20  # pixels of left/right padding for status bar
-STATUS_BAR_ITEM_SPACING = 2  # pixels of spacing between right-side status bar items
+STATUS_BAR_ITEM_SPACING = 8  # pixels of spacing between right-side status bar items
 STATUS_BAR_FONT_FAMILY = ""  # empty = use editor font family for status bar text
 
 # Sketch Pad Toolbar
