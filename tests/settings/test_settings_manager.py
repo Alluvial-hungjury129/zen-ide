@@ -151,10 +151,10 @@ class TestSetSetting:
                 patch("shared.settings.settings_manager._settings", None),
             ):
                 load_settings()
-                set_setting("theme", "matrix")
+                set_setting("theme", "trix")
                 # Read file directly
                 data = json.loads(settings_file.read_text())
-                assert data["theme"] == "matrix"
+                assert data["theme"] == "trix"
 
 
 class TestLoadSettings:

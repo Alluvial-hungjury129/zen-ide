@@ -73,6 +73,8 @@ class TerminalMarkdownRenderer:
         self._pygments_formatter = None  # Cached Pygments formatter instance
         self._terminal_width_fn = terminal_width_fn
         self._seen_content = False
+        self._last_was_list_item = False  # Track for collapsing loose-list blank lines
+        self._deferred_blank = False  # True when a blank line after a list item is held back
 
     def update_colors(self, colors: dict[str, str]):
         """Update theme colors. Keys: header, code, inline_code, quote, link, list, accent."""
@@ -119,6 +121,8 @@ class TerminalMarkdownRenderer:
         self._table_buffer = []
         self._in_table = False
         self._seen_content = False
+        self._last_was_list_item = False
+        self._deferred_blank = False
 
     def feed(self, text: str) -> str:
         """Feed a chunk of text and return formatted output.
@@ -225,6 +229,8 @@ class TerminalMarkdownRenderer:
                 lang_label = f" {self._code_language}" if self._code_language else ""
                 bar_len = max(0, self._code_block_width - 4 - _display_width(lang_label))
                 top = f"{fg}{self.DIM}┌──{lang_label}{'─' * bar_len}┐{self.RESET}"
+                self._last_was_list_item = False
+                self._deferred_blank = False
                 return (table_out + top) if table_out else top
             else:
                 # End of code block — emit bottom border
@@ -235,6 +241,8 @@ class TerminalMarkdownRenderer:
                 self._code_buffer = []
                 self._code_lexer = None
                 self._code_block_width = 0
+                self._last_was_list_item = False
+                self._deferred_blank = False
                 return bottom
 
         # Inside code block — emit line immediately with highlighting
@@ -249,19 +257,48 @@ class TerminalMarkdownRenderer:
                 # Separator row
                 self._table_buffer.append(stripped)
                 self._in_table = True
+                self._last_was_list_item = False
+                self._deferred_blank = False
                 return None
             elif self._in_table or stripped.startswith("|"):
                 self._table_buffer.append(stripped)
                 self._in_table = True
+                self._last_was_list_item = False
+                self._deferred_blank = False
                 return None
 
         # If we were in a table and hit a non-table line, flush the table
         if self._table_buffer:
             table_out = self._render_table()
+            self._last_was_list_item = False
+            self._deferred_blank = False
             formatted = self._format_regular_line(stripped)
             return table_out + "\n" + formatted
 
-        return self._format_regular_line(stripped)
+        # Collapse blank lines inside loose lists: when a blank line
+        # appears between two consecutive list items, suppress it so the
+        # list renders compactly.
+        if stripped == "":
+            if self._last_was_list_item:
+                # Hold the blank — emit it only if the next line is NOT a list item
+                self._deferred_blank = True
+                return None
+            # Normal blank line (not after a list item)
+            return self._format_regular_line(stripped)
+
+        # Non-blank line: check if we have a deferred blank to resolve
+        is_list = bool(_RE_LIST_ITEM.match(stripped))
+        prefix = ""
+        if self._deferred_blank:
+            self._deferred_blank = False
+            if not is_list:
+                # Next line is not a list item — emit the deferred blank
+                prefix = "\n"
+                self._last_was_list_item = False
+
+        result = self._format_regular_line(stripped)
+        self._last_was_list_item = is_list
+        return prefix + result if prefix else result
 
     def _format_regular_line(self, stripped: str) -> str:
         """Format a non-code, non-table line."""

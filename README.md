@@ -2,7 +2,7 @@
 
 <div align="left">    
   
-  [![Build](https://github.com/4mux/zen-ide/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/4mux/zen-ide/actions/workflows/build.yml)
+  [![](https://github.com/4mux/zen-ide/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/4mux/zen-ide/actions/workflows/build.yml)
   
   A minimalist and opinionated IDE built with Python and [GTK4](https://gitlab.gnome.org/GNOME/gtk).
   

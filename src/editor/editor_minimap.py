@@ -270,13 +270,78 @@ class EditorMinimap(Gtk.Widget):
         self._jump_to_y(y)
 
     def _on_drag_begin(self, gesture, start_x, start_y):
-        """Start drag scrolling."""
+        """Start drag scrolling.
+
+        Make the viewport "stick" to the mouse like in VSCode: record the
+        click position relative to the viewport rectangle (if the click was
+        inside it). During the drag we keep that relative offset under the
+        mouse so the handle follows the cursor instead of jumping/centering
+        the target line.
+        """
         self._drag_start_y = start_y
-        self._jump_to_y(start_y)
+
+        # Compute current viewport geometry in pixels
+        height = self.get_allocated_height()
+        vadj = self._scrolled.get_vadjustment()
+        upper = float(vadj.get_upper())
+        page = float(vadj.get_page_size())
+        # Guard against zero-height content
+        if height <= 0 or upper <= 0:
+            self._drag_vp_offset = 0.0
+            # Fallback to previous behaviour
+            self._jump_to_y(start_y)
+            return
+
+        vy_start = (float(vadj.get_value()) / upper) * height
+        vy_end = ((float(vadj.get_value()) + page) / upper) * height
+
+        # If clicked inside current viewport, remember offset within viewport
+        if start_y >= vy_start and start_y <= vy_end:
+            self._drag_vp_offset = start_y - vy_start
+        else:
+            # Click was outside viewport - behave like a grab in the middle
+            self._drag_vp_offset = (vy_end - vy_start) / 2.0
+
+        # Jump initially so user sees immediate feedback
+        self._apply_drag_position(start_y)
 
     def _on_drag_update(self, gesture, offset_x, offset_y):
         """Continue drag scrolling."""
-        self._jump_to_y(self._drag_start_y + offset_y)
+        current_y = self._drag_start_y + offset_y
+        self._apply_drag_position(current_y)
+
+    def _apply_drag_position(self, mouse_y: float):
+        """Set the scroll position so that the point at mouse_y - _drag_vp_offset
+        becomes the top of the viewport (i.e. viewport_start * height).
+        """
+        if self._total_lines == 0:
+            return
+
+        height = self.get_allocated_height()
+        if height == 0:
+            return
+
+        vadj = self._scrolled.get_vadjustment()
+        upper = float(vadj.get_upper())
+        page = float(vadj.get_page_size())
+
+        # Desired viewport top in pixels
+        desired_vy_start = mouse_y - getattr(self, "_drag_vp_offset", 0.0)
+
+        # Clamp to allowable range
+        max_vy_start = max(0.0, height - (page / upper) * height) if upper > 0 else 0.0
+        desired_vy_start = max(0.0, min(desired_vy_start, max_vy_start))
+
+        # Convert back to adjustment value and apply
+        desired_fraction = desired_vy_start / height
+        desired_value = desired_fraction * upper
+
+        # Clamp against adjustment min/max
+        min_val = float(vadj.get_lower())
+        max_val = float(vadj.get_upper() - page)
+        desired_value = max(min_val, min(desired_value, max_val))
+
+        vadj.set_value(desired_value)
 
     def _jump_to_y(self, y):
         """Scroll editor to the line corresponding to y position."""

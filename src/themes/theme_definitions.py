@@ -93,7 +93,7 @@ _THEME_REGISTRY = {
     "aura_dark": ("themes.definitions.aura_dark", "AURA_DARK", "Aura Dark", True),
     "aurora_borealis": ("themes.definitions.aurora_borealis", "AURORA_BOREALIS", "Aurora Borealis", True),
     "jellybeans": ("themes.definitions.jellybeans", "JELLYBEANS", "Jellybeans", True),
-    "matrix": ("themes.definitions.matrix", "MATRIX", "Matrix", True),
+    "trix": ("themes.definitions.trix", "TRIX", "Trix", True),
     "modus_vivendi": ("themes.definitions.modus_vivendi", "MODUS_VIVENDI", "Modus Vivendi", True),
     "new_aura_dark": ("themes.definitions.new_aura_dark", "NEW_AURA_DARK", "New Aura Dark", True),
     "nyoom": ("themes.definitions.nyoom", "NYOOM", "Nyoom", True),

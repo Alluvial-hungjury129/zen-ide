@@ -152,6 +152,10 @@ class CopilotHTTPProvider:
     _shared_api_base_url: Optional[str] = None
     _cached_models: Optional[list] = None
     _models_fetched: bool = False
+    # Prevent multiple concurrent token refreshes causing a stampede
+    _token_refresh_lock = threading.Lock()
+    # How long to allow a streaming connection to be idle (no data) before aborting
+    _IDLE_STREAM_TIMEOUT_S = 300
 
     def __init__(self):
         self._stop_requested = False
@@ -477,6 +481,7 @@ class CopilotHTTPProvider:
 
                 buffer = ""
                 finish_reason = None
+                last_activity = time.monotonic()
 
                 while True:
                     if self._stop_requested:
@@ -485,8 +490,12 @@ class CopilotHTTPProvider:
                     try:
                         raw_line = self._current_response.readline()
                     except socket.timeout:
-                        # Socket read timed out — check if we should stop
+                        # Socket read timed out — check idle timeout and stop flag
                         if self._stop_requested:
+                            break
+                        if time.monotonic() - last_activity > CopilotHTTPProvider._IDLE_STREAM_TIMEOUT_S:
+                            stream_error_type = "idle_timeout"
+                            ai_log.event("stream_idle_timeout", "copilot: no data for idle timeout")
                             break
                         continue  # Keep waiting for data
                     except OSError as e:
@@ -497,6 +506,9 @@ class CopilotHTTPProvider:
                     if not raw_line:
                         # End of stream
                         break
+
+                    # We received data — update last activity timestamp
+                    last_activity = time.monotonic()
 
                     line = raw_line.decode("utf-8", errors="replace")
                     buffer += line
@@ -695,40 +707,59 @@ class CopilotHTTPProvider:
             ):
                 return CopilotHTTPProvider._shared_session_token
 
-        tokens = _load_github_tokens()
-        if not tokens:
-            self._last_error = "No GitHub token found"
-            return None
-
-        last_error = None
-        for github_token in tokens:
-            req = urllib.request.Request(
-                _TOKEN_URL,
-                headers={
-                    "Authorization": f"token {github_token}",
-                    "Accept": "application/json",
-                    "User-Agent": _USER_AGENT,
-                },
-            )
-
-            try:
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    data = json.loads(resp.read())
-
-                with CopilotHTTPProvider._shared_lock:
-                    CopilotHTTPProvider._shared_session_token = data["token"]
-                    CopilotHTTPProvider._shared_token_expires_at = float(data["expires_at"])
-                    endpoints = data.get("endpoints", {})
-                    if "api" in endpoints:
-                        CopilotHTTPProvider._shared_api_base_url = endpoints["api"].rstrip("/")
+        # Prevent many threads from simultaneously trying to refresh the session
+        # token (stampede). One thread performs the exchange while others wait.
+        with CopilotHTTPProvider._token_refresh_lock:
+            # Re-check cached token after acquiring refresh lock (another thread
+            # may have refreshed while we were waiting).
+            with CopilotHTTPProvider._shared_lock:
+                if (
+                    CopilotHTTPProvider._shared_session_token
+                    and time.time() < CopilotHTTPProvider._shared_token_expires_at - _TOKEN_REFRESH_MARGIN_S
+                ):
                     return CopilotHTTPProvider._shared_session_token
-            except urllib.error.HTTPError as e:
-                last_error = f"HTTP {e.code}: {e.reason}"
-            except Exception as e:
-                last_error = str(e)
 
-        self._last_error = last_error
-        return None
+            tokens = _load_github_tokens()
+            if not tokens:
+                self._last_error = "No GitHub token found"
+                return None
+
+            last_error = None
+            for github_token in tokens:
+                req = urllib.request.Request(
+                    _TOKEN_URL,
+                    headers={
+                        "Authorization": f"token {github_token}",
+                        "Accept": "application/json",
+                        "User-Agent": _USER_AGENT,
+                    },
+                )
+
+                try:
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        data = json.loads(resp.read())
+
+                    with CopilotHTTPProvider._shared_lock:
+                        CopilotHTTPProvider._shared_session_token = data["token"]
+                        CopilotHTTPProvider._shared_token_expires_at = float(data["expires_at"])
+                        endpoints = data.get("endpoints", {})
+                        if "api" in endpoints:
+                            CopilotHTTPProvider._shared_api_base_url = endpoints["api"].rstrip("/")
+                        return CopilotHTTPProvider._shared_session_token
+                except urllib.error.HTTPError as e:
+                    last_error = f"HTTP {e.code}: {e.reason}"
+                except Exception as e:
+                    last_error = str(e)
+
+            # If we failed to obtain a token, avoid hammering the token endpoint
+            # by setting a short cooldown before the next refresh attempt.
+            cooldown = 5
+            with CopilotHTTPProvider._shared_lock:
+                CopilotHTTPProvider._shared_session_token = None
+                CopilotHTTPProvider._shared_token_expires_at = time.time() + cooldown
+
+            self._last_error = last_error
+            return None
 
     def stop(self):
         """Stop the current streaming request."""

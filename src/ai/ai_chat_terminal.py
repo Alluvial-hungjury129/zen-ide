@@ -1201,8 +1201,9 @@ class AIChatTerminalView(Gtk.Box):
                     elif entry[0] == "action":
                         # Flush any pending stream content first
                         _flush_stream()
-                        # Feed the pre-rendered action text directly
-                        self.terminal.feed(entry[1])
+                        # Feed the pre-rendered action text through _append_text
+                        # so cross-call newline normalisation applies.
+                        self._append_text(entry[1])
                     elif entry[0] == "reset":
                         # Flush stream, then reset renderer state
                         _flush_stream()
@@ -1483,6 +1484,7 @@ class AIChatTerminalView(Gtk.Box):
         self._assistant_block_started = False
         self._tool_iteration_count = 0
         self._current_tool_calls = []
+        self._accumulated_response_text = ""  # Accumulate text across tool-use turns
         if self._thinking_defer_source is not None:
             GLib.source_remove(self._thinking_defer_source)
             self._thinking_defer_source = None
@@ -1622,13 +1624,20 @@ class AIChatTerminalView(Gtk.Box):
             return
 
         try:
+            # Accumulate any text the AI produced before requesting tool use.
+            # The provider resets its text buffer for each new turn, so we
+            # must capture intermediate text here to avoid losing it when
+            # the final on_complete fires with only the last turn's text.
+            if text_response:
+                self._accumulated_response_text += text_response
+
             self._tool_iteration_count += len(tool_calls)
             yolo_mode = get_setting("ai.yolo_mode", True)
             if not yolo_mode and self._tool_iteration_count > _MAX_TOOL_ITERATIONS:
                 self._append_text(
                     "\n[Tool use limit reached — send 'continue' to resume, or enable yolo_mode in settings for unlimited tool use]\n"
                 )
-                msg = {"role": "assistant", "content": text_response + "\n[Tool use limit reached]"}
+                msg = {"role": "assistant", "content": self._accumulated_response_text + "\n[Tool use limit reached]"}
                 if self._current_tool_calls:
                     msg["tool_calls_display"] = self._current_tool_calls[:]
                 self.messages.append(msg)
@@ -1637,6 +1646,11 @@ class AIChatTerminalView(Gtk.Box):
                 self._http_provider = None
                 self._finish_processing()
                 return
+
+            # Clean up spinner and thinking state before displaying tool calls
+            self._stop_spinner()
+            if self._in_thinking:
+                self._collapse_thinking_block()
 
             # Display each tool call on the main thread (UI work)
             theme = get_theme()
@@ -1660,7 +1674,7 @@ class AIChatTerminalView(Gtk.Box):
 
                 # Display the tool call (UI — must be on main thread)
                 display = self._format_tool_display(name, inp)
-                action_ansi = f"\r{ansi_action}{display}\033[0m\n"
+                action_ansi = f"\n\n{ansi_action}{display}\033[0m\n"
                 self._display_buffer.append(("action", action_ansi))
                 self._append_text(action_ansi)
 
@@ -1778,12 +1792,13 @@ class AIChatTerminalView(Gtk.Box):
         action, detail = labels.get(name, (name, str(inp)))
 
         # Split detail into lines and format with box-drawing chars.
-        # Leading \n\n ensures exactly one blank line before the action
-        # (paragraphs are separated by one blank line, not less not more).
+        # Returns just the action block content (no leading/trailing blank
+        # lines).  Callers are responsible for paragraph spacing via
+        # _append_text which normalises gaps to exactly 1 blank line.
         lines = detail.split("\n") if detail else [""]
         if len(lines) == 1:
             # Single line: just use └
-            return f"\n\n{action}\n └ {lines[0]}\n"
+            return f"{action}\n └ {lines[0]}"
         else:
             # Multiple lines: use │ for all but last, └ for last
             formatted_lines = []
@@ -1792,7 +1807,7 @@ class AIChatTerminalView(Gtk.Box):
                     formatted_lines.append(f" │ {line}")
                 else:
                     formatted_lines.append(f" └ {line}")
-            return f"\n\n{action}\n" + "\n".join(formatted_lines) + "\n"
+            return f"{action}\n" + "\n".join(formatted_lines)
 
     def _on_http_chunk(self, text: str):
         """Handle a streaming chunk from an HTTP provider (main thread)."""
@@ -1893,6 +1908,15 @@ class AIChatTerminalView(Gtk.Box):
 
             text = getattr(self, "_http_full_response", "")
 
+            # Combine accumulated text from intermediate tool-use turns with
+            # the final turn's response.  The provider resets its text buffer
+            # on each continue_with_tool_results() call, so _http_full_response
+            # only contains the last turn's text.  _accumulated_response_text
+            # captures all prior turns' text so nothing is lost on restart.
+            accumulated = getattr(self, "_accumulated_response_text", "")
+            if accumulated:
+                text = accumulated + text
+
             # --- Yolo mode: auto-continue if the model hallucinated a tool limit ---
             if text and get_setting("ai.yolo_mode", True) and self._tool_limit_patterns_in(text):
                 # Strip the hallucinated limit message from the stored response
@@ -1974,6 +1998,7 @@ class AIChatTerminalView(Gtk.Box):
             self._thinking_throttle_source = None
         self._update_renderer_colors()
         self._http_full_response = ""
+        self._accumulated_response_text = ""  # Reset for the new auto-continue cycle
 
         self._start_spinner()
 
@@ -2277,29 +2302,52 @@ class AIChatTerminalView(Gtk.Box):
 
     def _append_text(self, text: str):
         """Append text to the canvas."""
-        # Collapse 3+ consecutive newlines to 2 (max 1 blank line)
-        text = re.sub(r"\n{3,}", "\n\n", text)
+        # Collapse 3+ consecutive newlines to 2 (max 1 blank line).
+        # Also collapse \n sequences that have \r mixed in (e.g. \n\r\n\r\n).
+        text = re.sub(r"(\n\r?){3,}", "\n\n", text)
 
         # Cross-call normalisation: if the buffer already ends with blank
         # lines, strip leading newlines from the new text to avoid doubling
         # the gap.  This ensures exactly 1 blank line between paragraphs
         # even when consecutive _append_text calls both include spacing.
+        #
+        # The text may start with non-newline chars that don't produce
+        # visible output (e.g. \r, ANSI escapes like \033[...m).  We need
+        # to look past them to find the first \n and normalize it against
+        # the buffer's trailing blank lines.
         buf = self.terminal._buffer
         line_count = buf.get_line_count()
-        if line_count >= 2 and text.startswith("\n"):
-            # Count trailing empty lines already in the buffer
-            trailing_empty = 0
-            for idx in range(line_count - 1, -1, -1):
-                if buf.get_line_text(idx).strip() == "":
-                    trailing_empty += 1
-                else:
-                    break
-            # Strip leading newlines from text, then re-add just enough
-            # to reach exactly 1 blank line (2 newlines total: end-of-line + blank).
-            if trailing_empty > 0:
-                stripped = text.lstrip("\n")
-                needed = max(0, 2 - trailing_empty)
-                text = "\n" * needed + stripped
+        if line_count >= 2:
+            # Find position of first \n, skipping any leading \r and ANSI escapes
+            prefix_match = re.match(r"^((?:\r|\033\[[0-9;]*m)*)\n", text)
+            has_leading_newline = text.startswith("\n") or prefix_match is not None
+
+            if has_leading_newline:
+                # Count trailing empty lines already in the buffer
+                trailing_empty = 0
+                for idx in range(line_count - 1, -1, -1):
+                    if buf.get_line_text(idx).strip() == "":
+                        trailing_empty += 1
+                    else:
+                        break
+
+                if trailing_empty > 0:
+                    if prefix_match and not text.startswith("\n"):
+                        # Separate the non-newline prefix (\r, ANSI codes)
+                        # from the newlines that follow it.
+                        prefix_end = prefix_match.end(1)
+                        prefix_part = text[:prefix_end]
+                        rest = text[prefix_end:]
+                        stripped = rest.lstrip("\n")
+                        # Use 2 - trailing_empty because the cursor sits ON
+                        # the last empty line; feeding content without a \n
+                        # would overwrite it, collapsing the intended gap.
+                        needed = max(0, 2 - trailing_empty)
+                        text = prefix_part + "\n" * needed + stripped
+                    else:
+                        stripped = text.lstrip("\n")
+                        needed = max(0, 2 - trailing_empty)
+                        text = "\n" * needed + stripped
 
         # For multi-line text, ensure each line starts at column 0
         # by prepending \r to each line (prevents text shift on restore)
@@ -2683,6 +2731,11 @@ class AIChatTerminalView(Gtk.Box):
         self._response_buffer = []
         self._display_buffer = []
 
+        # Include accumulated text from intermediate tool-use turns
+        accumulated = getattr(self, "_accumulated_response_text", "")
+        if accumulated:
+            partial = accumulated + partial
+
         if not silent:
             self._append_text("\n[Stopped]\n")
 
@@ -2861,7 +2914,7 @@ class AIChatTerminalView(Gtk.Box):
                     ansi_action = _hex_to_ansi_fg(action_color)
                     for tc in tool_calls_display:
                         display = self._format_tool_display(tc.get("name", ""), tc.get("input", {}))
-                        self._append_text(f"\r{ansi_action}{display}\033[0m\n")
+                        self._append_text(f"\n\n{ansi_action}{display}\033[0m\n")
                 # Render thinking block if present
                 thinking = msg.get("thinking", "")
                 if thinking:

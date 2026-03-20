@@ -136,7 +136,7 @@ a = Analysis(
         'themes.definitions.jellybeans',
         'themes.definitions.kanagawa',
         'themes.definitions.laserwave',
-        'themes.definitions.matrix',
+        'themes.definitions.trix',
         'themes.definitions.melange_dark',
         'themes.definitions.melange_light',
         'themes.definitions.modus_vivendi',

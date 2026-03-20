@@ -6,6 +6,7 @@ NvimPopup-based dialog with two combo boxes:
 2. Model selector (populated based on selected provider)
 """
 
+import datetime
 import threading
 
 from gi.repository import Gdk, GLib, Gtk
@@ -123,6 +124,13 @@ class AISettingsPopup(NvimPopup):
         self._auth_btn.connect("clicked", self._on_auth_clicked)
         provider_row.append(self._auth_btn)
 
+        # New: Show status / usage button
+        self._status_btn = Gtk.Button(label="Show usage")
+        self._status_btn.add_css_class("nvim-popup-button")
+        self._status_btn.set_tooltip_text("Show provider usage / credits / limits")
+        self._status_btn.connect("clicked", self._on_status_clicked)
+        provider_row.append(self._status_btn)
+
         # Setup button (shown only when provider needs API key)
         self._setup_btn = Gtk.Button(label="  Configure API Key…")
         self._setup_btn.add_css_class("nvim-popup-button")
@@ -159,6 +167,9 @@ class AISettingsPopup(NvimPopup):
 
         # Fetch real models in background
         self._fetch_models_async(self._current_provider)
+
+        # Update auth button / status for current provider
+        self._update_auth_and_status_buttons()
 
     def _select_model_in_dropdown(self, model_name: str):
         """Select a model in the model dropdown by name."""
@@ -284,6 +295,341 @@ class AISettingsPopup(NvimPopup):
         """Handle authorize / API key setup button click."""
         if self._on_setup_api_key:
             self._on_setup_api_key(self._current_provider)
+
+    def _on_status_clicked(self, button):
+        """Show provider usage/credits/limits in a small popup."""
+        # Determine provider
+        selected_idx = self._provider_dropdown.get_selected()
+        if selected_idx < len(self._provider_ids):
+            provider = self._provider_ids[selected_idx]
+        else:
+            provider = self._current_provider
+
+        # Fetch info in background to avoid blocking UI
+        def fetch_and_show():
+            info = self._gather_provider_status(provider)
+            GLib.idle_add(self._show_status_dialog, provider, info)
+
+        threading.Thread(target=fetch_and_show, daemon=True).start()
+
+    def _update_auth_and_status_buttons(self):
+        """Update auth/config visibility and status button sensitivity."""
+        needs_setup = not self._provider_availability.get(self._current_provider, False)
+        self._setup_btn.set_visible(needs_setup)
+        # Auth button only for providers that support interactive auth (Copilot)
+        copilot_idx = self._provider_ids.index(PROVIDER_COPILOT_API)
+        # If provider is copilot, enable auth otherwise disable
+        selected_idx = self._provider_dropdown.get_selected()
+        if selected_idx < len(self._provider_ids) and self._provider_ids[selected_idx] == PROVIDER_COPILOT_API:
+            self._auth_btn.set_sensitive(True)
+        else:
+            self._auth_btn.set_sensitive(False)
+
+        # Status button only enabled if provider available or supports querying
+        self._status_btn.set_sensitive(True)
+
+    def _gather_provider_status(self, provider: str) -> dict:
+        """Collect provider-specific status. This may perform network requests.
+
+        Additionally, gather lightweight usage/debug information from the local
+        ai_debug_log (if available). This provides recent request counts,
+        requested max_tokens and response character totals so the popup can show
+        an approximate usage summary even when provider billing APIs aren't used.
+        """
+        from ai import AnthropicHTTPProvider, CopilotHTTPProvider
+
+        status = {"provider": provider, "checked_at": datetime.datetime.utcnow().isoformat() + "Z"}
+        try:
+            if provider == PROVIDER_ANTHROPIC_API:
+                p = AnthropicHTTPProvider()
+                status["available"] = p.is_available
+                # Try to fetch models as a lightweight API call to verify key and list models
+                try:
+                    models = p.get_available_models()
+                    status["models_count"] = len(models)
+                    status["models"] = models[:5]
+                except Exception as e:
+                    status["models_error"] = str(e)
+            elif provider == PROVIDER_COPILOT_API:
+                p = CopilotHTTPProvider()
+                status["available"] = p.is_available
+                try:
+                    models = p.get_available_models()
+                    status["models_count"] = len(models)
+                    status["models"] = models[:5]
+                except Exception as e:
+                    status["models_error"] = str(e)
+
+                # If Copilot session token caching is present, surface expiry info
+                try:
+                    expires_at = getattr(CopilotHTTPProvider, "_shared_token_expires_at", 0)
+                    session_token = getattr(CopilotHTTPProvider, "_shared_session_token", None)
+                    if session_token and expires_at:
+                        import time
+
+                        remaining = int(expires_at - time.time())
+                        status["copilot_session_expires_in_s"] = max(0, remaining)
+                except Exception:
+                    pass
+            else:
+                status["available"] = False
+        except Exception as exc:
+            status["error"] = str(exc)
+
+        # Augment with recent request/stream summary from ai_debug_log if present.
+        try:
+            from shared.ai_debug_log import get_ai_debug_log_path
+
+            log_path = get_ai_debug_log_path()
+            if log_path and log_path.exists():
+                raw = log_path.read_text(encoding="utf-8")
+                lines = raw.strip().splitlines()[-1000:]
+
+                total_requests = 0
+                total_max_tokens = 0
+                total_response_chars = 0
+                recent = []
+
+                for ln in lines:
+                    # Simple timestamp prefix removal for recent display
+                    display_ln = ln
+                    if "REQUEST" in ln and f"provider={provider}" in ln:
+                        total_requests += 1
+                        # Extract max_tokens=N
+                        try:
+                            if "max_tokens=" in ln:
+                                part = ln.split("max_tokens=")[-1].split()[0]
+                                total_max_tokens += int(part)
+                        except Exception:
+                            pass
+                        recent.append(display_ln)
+                    elif "STREAM_END" in ln and f"provider={provider}" in ln:
+                        # Example: ... response_chars=4096 ...
+                        try:
+                            if "response_chars=" in ln:
+                                part = ln.split("response_chars=")[-1].split()[0]
+                                total_response_chars += int(part)
+                        except Exception:
+                            pass
+                        recent.append(display_ln)
+
+                status["debug_log"] = {
+                    "path": str(log_path),
+                    "total_requests": total_requests,
+                    "total_max_tokens": total_max_tokens,
+                    "total_response_chars": total_response_chars,
+                    "recent": recent[-8:],
+                }
+        except Exception:
+            # If anything goes wrong parsing the log, just skip debug info
+            pass
+
+        return status
+
+    def _show_status_dialog(self, provider: str, info: dict):
+        """Display collected status in a simple dialog inside the popup.
+
+        The dialog now includes a short debug/usage summary aggregated from the
+        local ai_debug_log (when available) to give an idea of recent requests
+        and character/approximate token usage.
+        """
+        # Build message text
+        lines = [f"Provider: {_PROVIDER_DISPLAY.get(provider, provider)}"]
+        if "error" in info:
+            lines.append(f"Error: {info['error']}")
+        else:
+            lines.append(f"Checked at (UTC): {info.get('checked_at')}")
+            lines.append(f"Available: {info.get('available')}")
+            if "models_count" in info:
+                lines.append(f"Models: {info.get('models_count')}")
+                if "models" in info:
+                    lines.append("Sample: " + ", ".join(info.get("models", [])))
+            if "models_error" in info:
+                lines.append("Models error: " + info.get("models_error"))
+
+            # Copilot token expiry if present
+            if "copilot_session_expires_in_s" in info:
+                sec = info.get("copilot_session_expires_in_s", 0)
+                lines.append(f"Copilot session token expires in: {sec}s")
+
+            # Debug log summary
+            dbg = info.get("debug_log")
+            if dbg:
+                lines.append("")
+                lines.append("Recent activity (from ai_debug_log):")
+                lines.append(f"Log path: {dbg.get('path')}")
+                lines.append(f"Requests recorded: {dbg.get('total_requests')}")
+                lines.append(f"Total requested max_tokens (sum): {dbg.get('total_max_tokens')}")
+                lines.append(f"Total response characters (sum): {dbg.get('total_response_chars')}")
+                # Provide a rough token estimate (chars/4 heuristic)
+                try:
+                    est_tokens = int(dbg.get("total_response_chars", 0) / 4)
+                    lines.append(f"Estimated response tokens (chars/4): {est_tokens}")
+                except Exception:
+                    pass
+                if dbg.get("recent"):
+                    lines.append("")
+                    lines.append("Recent log lines:")
+                    for r in dbg.get("recent", []):
+                        # Truncate recent lines to reasonable length
+                        lines.append((r if len(r) <= 240 else (r[:237] + "…")))
+
+        text = "\n".join(lines)
+
+        dialog = Gtk.MessageDialog(
+            transient_for=self,
+            modal=True,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text="Provider status",
+        )
+        # gi/GTK bindings differ between versions: MessageDialog may not have
+        # format_secondary_text. Fall back to adding a label to the content
+        # area when necessary.
+        if hasattr(dialog, "format_secondary_text"):
+            dialog.format_secondary_text(text)
+        else:
+            # Create a label to show the status text. Make it selectable and wrapped
+            # where the binding supports these APIs.
+            secondary_label = Gtk.Label(label=text)
+            # Some gi/GTK bindings use set_selectable, others expose selectable property.
+            if hasattr(secondary_label, "set_selectable"):
+                try:
+                    secondary_label.set_selectable(True)
+                except Exception:
+                    pass
+            else:
+                try:
+                    secondary_label.set_property("selectable", True)
+                except Exception:
+                    pass
+            # Line wrap method differs between GTK versions/bindings.
+            if hasattr(secondary_label, "set_line_wrap"):
+                try:
+                    secondary_label.set_line_wrap(True)
+                except Exception:
+                    pass
+            elif hasattr(secondary_label, "set_wrap"):
+                try:
+                    secondary_label.set_wrap(True)
+                except Exception:
+                    pass
+            else:
+                # Fall back to enabling line wrap via property if available
+                try:
+                    secondary_label.set_property("wrap", True)
+                except Exception:
+                    pass
+
+            # Create a scrolled window so long outputs are scrollable.
+            scroller = Gtk.ScrolledWindow()
+            # Prefer min content sizing when available; otherwise fall back to size_request.
+            try:
+                scroller.set_min_content_height(240)
+            except Exception:
+                try:
+                    scroller.set_size_request(-1, 240)
+                except Exception:
+                    pass
+            try:
+                scroller.set_min_content_width(520)
+            except Exception:
+                pass
+            # Set scroll policy where available (GTK3)
+            try:
+                scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+            except Exception:
+                pass
+
+            # Add the label into the scroller; API differs between GTK3/GTK4.
+            added = False
+            try:
+                # GTK4
+                scroller.set_child(secondary_label)
+                added = True
+            except Exception:
+                try:
+                    # GTK3
+                    scroller.add(secondary_label)
+                    added = True
+                except Exception:
+                    added = False
+
+            # Margin for the label where supported
+            try:
+                if hasattr(secondary_label, "set_margin_top"):
+                    secondary_label.set_margin_top(8)
+                else:
+                    secondary_label.set_property("margin-top", 8)
+            except Exception:
+                pass
+
+            content_area = dialog.get_content_area()
+            # GTK4 Boxes use append; older GTK may use add. Try append first.
+            try:
+                content_area.append(scroller)
+            except AttributeError:
+                try:
+                    content_area.add(scroller)
+                except Exception:
+                    # As a very last resort, add the label itself
+                    try:
+                        content_area.append(secondary_label)
+                    except Exception:
+                        try:
+                            content_area.add(secondary_label)
+                        except Exception:
+                            pass
+
+        def _on_dialog_response(dlg, response):
+            # Destroy the dialog to ensure any modal grabs are released.
+            try:
+                dlg.destroy()
+            except Exception:
+                try:
+                    dlg.close()
+                except Exception:
+                    pass
+
+            # Restore focus to the AI settings popup (or its parent) on the next
+            # idle tick to avoid re-entrancy issues with GTK focus handling.
+            def _restore_focus():
+                try:
+                    # Try to restore focus to a sensible widget inside the AI settings
+                    # popup rather than re-presenting the window (which can confuse
+                    # some GTK focus/grab states). Prefer the provider dropdown.
+                    try:
+                        if hasattr(self, "_provider_dropdown") and self._provider_dropdown:
+                            self._provider_dropdown.grab_focus()
+                            return False
+                    except Exception:
+                        pass
+
+                    # Fallback to giving focus to the popup window itself
+                    try:
+                        self.grab_focus()
+                        return False
+                    except Exception:
+                        pass
+
+                    # Final fallback: present the parent window so the app regains
+                    # key focus.
+                    if self._parent:
+                        try:
+                            self._parent.present()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                return False
+
+            try:
+                GLib.idle_add(_restore_focus)
+            except Exception:
+                pass
+
+        dialog.connect("response", _on_dialog_response)
+        dialog.present()
 
     def _on_focus_leave(self, controller):
         """Override to prevent close when dropdown popover takes focus."""

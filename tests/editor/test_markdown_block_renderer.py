@@ -246,3 +246,66 @@ class TestHtmlBlockNesting:
         image_blocks = [b for b in blocks if b.kind == "image"]
         assert len(image_blocks) == 1
         assert image_blocks[0].image_url == "logo.png"
+
+
+class TestLinkedImages:
+    """Linked images [![alt](img_url)](link_url) should be rendered as image blocks."""
+
+    def test_standalone_linked_image(self, renderer):
+        """A standalone linked image on its own line should produce an image block."""
+        md = "[![Build](https://example.com/badge.svg)](https://example.com/build)"
+        blocks = renderer.render(md)
+        image_blocks = [b for b in blocks if b.kind == "image"]
+        assert len(image_blocks) == 1
+        assert image_blocks[0].image_url == "https://example.com/badge.svg"
+        assert image_blocks[0].image_alt == "Build"
+
+    def test_linked_image_in_div(self, renderer):
+        """A linked image inside an HTML <div> should produce an image block."""
+        md = """<div align="left">
+
+  [![Build](https://github.com/4mux/zen-ide/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/4mux/zen-ide/actions/workflows/build.yml)
+
+  A minimalist IDE.
+
+</div>"""
+        blocks = renderer.render(md)
+        image_blocks = [b for b in blocks if b.kind == "image"]
+        assert len(image_blocks) == 1
+        assert "badge.svg" in image_blocks[0].image_url
+        assert image_blocks[0].image_alt == "Build"
+        # The text "A minimalist IDE." should be in a paragraph
+        para_blocks = [b for b in blocks if b.kind == "paragraph"]
+        assert any("minimalist" in "".join(s.text for s in b.spans) for b in para_blocks)
+
+    def test_linked_image_inline_in_paragraph(self, renderer):
+        """A linked image inline with text should produce an InlineSpan with image_url."""
+        md = "Check out [![Badge](https://example.com/badge.png)](https://example.com) for status."
+        blocks = renderer.render(md)
+        para_blocks = [b for b in blocks if b.kind == "paragraph"]
+        assert len(para_blocks) == 1
+        # Should have a span with image_url set
+        image_spans = [s for s in para_blocks[0].spans if s.image_url]
+        assert len(image_spans) == 1
+        assert image_spans[0].image_url == "https://example.com/badge.png"
+        assert image_spans[0].link_url == "https://example.com"
+
+    def test_multiple_linked_images_in_div(self, renderer):
+        """Multiple linked images in an HTML block should each become image blocks."""
+        md = """<div>
+  [![A](https://example.com/a.png)](https://example.com/a)
+  [![B](https://example.com/b.png)](https://example.com/b)
+</div>"""
+        blocks = renderer.render(md)
+        image_blocks = [b for b in blocks if b.kind == "image"]
+        assert len(image_blocks) == 2
+        assert image_blocks[0].image_url == "https://example.com/a.png"
+        assert image_blocks[1].image_url == "https://example.com/b.png"
+
+    def test_regular_image_not_affected(self, renderer):
+        """Regular ![alt](url) images should still work."""
+        md = "![Screenshot](screenshots/demo.png)"
+        blocks = renderer.render(md)
+        image_blocks = [b for b in blocks if b.kind == "image"]
+        assert len(image_blocks) == 1
+        assert image_blocks[0].image_url == "screenshots/demo.png"

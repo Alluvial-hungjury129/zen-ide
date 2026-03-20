@@ -212,8 +212,3 @@ All feature documentation lives in `docs/`. Read the relevant doc before working
 | [docs/2026_03_17_welcome_screen.md](docs/2026_03_17_welcome_screen.md) | Welcome screen: ASCII logo, version from pyproject.toml, keyboard shortcuts |
 | [docs/2026_03_17_widget_inspector.md](docs/2026_03_17_widget_inspector.md) | Widget inspector: DevTools-like inspect mode, AI chat block & color inspection |
 | [docs/2026_01_18_unicode.md](docs/2026_01_18_unicode.md) | Unicode box-drawing character reference |
-
-### Other
-| Doc | Description |
-|-----|-------------|
-| [docs/2026_01_21_notes_on_vibe_session.md](docs/2026_01_21_notes_on_vibe_session.md) | Notes on vibe coding practices and AGENTS.md evolution |

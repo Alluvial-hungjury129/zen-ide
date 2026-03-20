@@ -19,6 +19,7 @@ class InlineSpan:
     code: bool = False
     strikethrough: bool = False
     link_url: str | None = None
+    image_url: str | None = None  # remote/local image URL for inline image spans
 
 
 @dataclass

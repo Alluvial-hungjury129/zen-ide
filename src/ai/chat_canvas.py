@@ -530,28 +530,71 @@ class ChatCanvas(Gtk.DrawingArea):
             self._wrap_map = [self._visual_rows_for_line(i, content_width_px) for i in range(line_count)]
             self._wrap_map_width = viewport_width
             self._wrap_map_line_count = line_count
+            # Full rebuild of cumulative offsets
+            self._wrap_offsets = [0] * (line_count + 1)
+            cumulative = 0
+            for i in range(line_count):
+                self._wrap_offsets[i] = cumulative
+                cumulative += self._wrap_map[i]
+            self._wrap_offsets[line_count] = cumulative if line_count > 0 else 0
+            self._total_visual_rows = cumulative
         else:
-            # Incremental: update dirty lines and append new lines
+            # Incremental: update dirty lines and append new lines.
+            # Track the earliest changed index for partial prefix-sum.
             dirty = self._buffer.dirty_lines
+            earliest_changed = line_count  # sentinel: nothing changed
+
             for idx in dirty:
                 if 0 <= idx < len(self._wrap_map):
-                    self._wrap_map[idx] = self._visual_rows_for_line(idx, content_width_px)
+                    new_rows = self._visual_rows_for_line(idx, content_width_px)
+                    if self._wrap_map[idx] != new_rows:
+                        self._wrap_map[idx] = new_rows
+                        if idx < earliest_changed:
+                            earliest_changed = idx
+
             # Append entries for newly added lines
-            for i in range(len(self._wrap_map), line_count):
+            old_count = len(self._wrap_map)
+            for i in range(old_count, line_count):
                 self._wrap_map.append(self._visual_rows_for_line(i, content_width_px))
+            if old_count < line_count and old_count < earliest_changed:
+                earliest_changed = old_count
+
             # Trim if buffer was shortened (shouldn't normally happen)
             if len(self._wrap_map) > line_count:
                 self._wrap_map = self._wrap_map[:line_count]
+                if line_count < earliest_changed:
+                    earliest_changed = line_count
             self._wrap_map_line_count = line_count
 
-        # Rebuild cumulative offsets
-        self._wrap_offsets = [0] * (line_count + 1)
-        cumulative = 0
-        for i in range(line_count):
-            self._wrap_offsets[i] = cumulative
-            cumulative += self._wrap_map[i]
-        self._wrap_offsets[line_count] = cumulative if line_count > 0 else 0
-        self._total_visual_rows = cumulative
+            # Partial prefix-sum: only recompute offsets from earliest_changed forward.
+            # For purely appended content (streaming), earliest_changed == old_count,
+            # so we only walk the new lines instead of the entire buffer.
+            if earliest_changed < line_count:
+                # Ensure offsets array is the right size
+                if len(self._wrap_offsets) != line_count + 1:
+                    # Size changed — extend or shrink
+                    old_offsets = self._wrap_offsets
+                    self._wrap_offsets = [0] * (line_count + 1)
+                    # Copy prefix up to earliest_changed
+                    copy_end = min(earliest_changed + 1, len(old_offsets))
+                    self._wrap_offsets[:copy_end] = old_offsets[:copy_end]
+
+                # Seed cumulative from the offset at earliest_changed
+                cumulative = self._wrap_offsets[earliest_changed]
+                for i in range(earliest_changed, line_count):
+                    self._wrap_offsets[i] = cumulative
+                    cumulative += self._wrap_map[i]
+                self._wrap_offsets[line_count] = cumulative
+                self._total_visual_rows = cumulative
+            elif len(self._wrap_offsets) != line_count + 1:
+                # Edge case: no content changed but array size is wrong
+                self._wrap_offsets = [0] * (line_count + 1)
+                cumulative = 0
+                for i in range(line_count):
+                    self._wrap_offsets[i] = cumulative
+                    cumulative += self._wrap_map[i]
+                self._wrap_offsets[line_count] = cumulative if line_count > 0 else 0
+                self._total_visual_rows = cumulative
 
     def _line_visual_y(self, line_idx: int) -> float:
         """Return the Y pixel offset for the start of *line_idx* (including wrap)."""
@@ -887,10 +930,7 @@ class ChatCanvas(Gtk.DrawingArea):
                 # a char with pixel width > char_width is wide, and
                 # box-drawing chars are detected by codepoint range.
                 cw = self._char_width
-                needs_grid = any(
-                    c[1] > cw + 0.5 or 0x2500 <= ord(c[0]) <= 0x257F
-                    for c in row_cells[run_start:run_end]
-                )
+                needs_grid = any(c[1] > cw + 0.5 or 0x2500 <= ord(c[0]) <= 0x257F for c in row_cells[run_start:run_end])
 
                 if needs_grid:
                     x = self._draw_wide_span_text(

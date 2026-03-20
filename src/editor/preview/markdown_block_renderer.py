@@ -28,6 +28,9 @@ class MarkdownBlockRenderer:
     _IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 
     _STANDALONE_IMAGE_RE = re.compile(r"^!\[([^\]]*)\]\(([^)]+)\)\s*$")
+    # Linked image: [![alt](image_url)](link_url)
+    _LINKED_IMAGE_RE = re.compile(r"\[!\[([^\]]*)\]\(([^)]+)\)\]\(([^)]+)\)")
+    _STANDALONE_LINKED_IMAGE_RE = re.compile(r"^\[!\[([^\]]*)\]\(([^)]+)\)\]\(([^)]+)\)\s*$")
 
     _HTML_IMG_STANDALONE_RE = re.compile(r"^<img\s[^>]*/?\s*>\s*$", re.IGNORECASE)
     _HTML_IMG_ATTR_RE = re.compile(r'(\w+)\s*=\s*["\']([^"\']*)["\']')
@@ -171,6 +174,20 @@ class MarkdownBlockRenderer:
                         )
                     )
                     continue
+
+            # Standalone linked image: [![alt](img_url)](link_url)
+            linked_img_match = self._STANDALONE_LINKED_IMAGE_RE.match(stripped)
+            if linked_img_match:
+                blocks.append(
+                    ContentBlock(
+                        kind="image",
+                        source_line=i,
+                        image_alt=linked_img_match.group(1),
+                        image_url=linked_img_match.group(2),
+                    )
+                )
+                i += 1
+                continue
 
             # Standalone image
             img_match = self._STANDALONE_IMAGE_RE.match(stripped)
@@ -323,6 +340,8 @@ class MarkdownBlockRenderer:
                     break
                 if self._STANDALONE_IMAGE_RE.match(s):
                     break
+                if self._STANDALONE_LINKED_IMAGE_RE.match(s):
+                    break
                 if self._HTML_IMG_STANDALONE_RE.match(s):
                     break
                 if self._HTML_BLOCK_OPEN_RE.match(s):
@@ -379,6 +398,7 @@ class MarkdownBlockRenderer:
         best_type = None
 
         for pattern, ptype in [
+            (self._LINKED_IMAGE_RE, "linked_image"),
             (self._IMAGE_RE, "image"),
             (self._LINK_RE, "link"),
             (self._BOLD_ITALIC_RE, "bold_italic"),
@@ -409,7 +429,13 @@ class MarkdownBlockRenderer:
                 )
             )
 
-        if best_type == "image":
+        if best_type == "linked_image":
+            alt = best_match.group(1)
+            image_url = best_match.group(2)
+            link_url = best_match.group(3)
+            # Render as an image span with the link URL attached
+            spans.append(InlineSpan(f"[image: {alt}]", italic=True, link_url=link_url, image_url=image_url))
+        elif best_type == "image":
             alt = best_match.group(1)
             spans.append(InlineSpan(f"[image: {alt}]", italic=True))
         elif best_type == "link":
@@ -644,13 +670,67 @@ class MarkdownBlockRenderer:
         if parser.text_parts and not parser.table_rows:
             text = " ".join(parser.text_parts).strip()
             if text:
-                blocks.append(
-                    ContentBlock(
-                        kind="paragraph",
-                        source_line=source_line,
-                        spans=self._parse_inline(text),
-                    )
-                )
+                # Check if text contains standalone linked images and extract them as image blocks
+                remaining_text = text
+                while remaining_text:
+                    linked_m = self._LINKED_IMAGE_RE.search(remaining_text)
+                    standalone_m = self._IMAGE_RE.search(remaining_text)
+
+                    # Pick whichever match comes first
+                    best_m = None
+                    best_type = None
+                    if linked_m and (standalone_m is None or linked_m.start() <= standalone_m.start()):
+                        best_m = linked_m
+                        best_type = "linked_image"
+                    elif standalone_m:
+                        best_m = standalone_m
+                        best_type = "image"
+
+                    if best_m is None:
+                        # No more images — emit remaining text as paragraph
+                        stripped_rem = remaining_text.strip()
+                        if stripped_rem:
+                            blocks.append(
+                                ContentBlock(
+                                    kind="paragraph",
+                                    source_line=source_line,
+                                    spans=self._parse_inline(stripped_rem),
+                                )
+                            )
+                        break
+
+                    # Text before the image match → paragraph
+                    before = remaining_text[: best_m.start()].strip()
+                    if before:
+                        blocks.append(
+                            ContentBlock(
+                                kind="paragraph",
+                                source_line=source_line,
+                                spans=self._parse_inline(before),
+                            )
+                        )
+
+                    # The image itself → image block
+                    if best_type == "linked_image":
+                        blocks.append(
+                            ContentBlock(
+                                kind="image",
+                                source_line=source_line,
+                                image_alt=best_m.group(1),
+                                image_url=best_m.group(2),
+                            )
+                        )
+                    else:
+                        blocks.append(
+                            ContentBlock(
+                                kind="image",
+                                source_line=source_line,
+                                image_alt=best_m.group(1),
+                                image_url=best_m.group(2),
+                            )
+                        )
+
+                    remaining_text = remaining_text[best_m.end() :]
 
         # If nothing was extracted, emit a blank to avoid losing source lines
         if not blocks:

@@ -1,10 +1,10 @@
-"""Matrix theme."""
+"""Trix theme."""
 
 from themes.theme_model import Theme
 
-MATRIX = Theme(
-    name="matrix",
-    display_name="Matrix",
+TRIX = Theme(
+    name="trix",
+    display_name="Trix",
     main_bg="#000000",
     panel_bg="#0a0a0a",
     fg_color="#00ff41",

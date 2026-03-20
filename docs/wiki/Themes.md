@@ -69,7 +69,7 @@ The theme picker shows a live preview as you browse — the IDE updates in real-
 ### Other
 | Theme | Style |
 |---|---|
-| `matrix` | The Matrix — green on black |
+| `trix` | Trix — green on black |
 | `ansi_blows` | ANSI Blows |
 | `modus_vivendi` | Modus Vivendi — high contrast |
 | `nyoom` | Nyoom — vibrant |
