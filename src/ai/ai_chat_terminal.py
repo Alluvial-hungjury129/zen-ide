@@ -1759,7 +1759,14 @@ class AIChatTerminalView(Gtk.Box):
 
     @staticmethod
     def _format_tool_display(name: str, inp: dict) -> str:
-        """Format a tool call for display in the chat."""
+        """Format a tool call for display in the chat.
+
+        Uses tree-style box-drawing characters:
+        - Single line detail:   └ detail
+        - Multi-line detail:    │ line1
+                                │ line2
+                                └ line3
+        """
         labels = {
             "read_file": ("Reading", inp.get("file_path", "")),
             "write_file": ("Writing", inp.get("file_path", "")),
@@ -1769,7 +1776,21 @@ class AIChatTerminalView(Gtk.Box):
             "run_command": ("Running", inp.get("command", "")),
         }
         action, detail = labels.get(name, (name, str(inp)))
-        return f"\n● {action}:\n  {detail}\n"
+
+        # Split detail into lines and format with box-drawing chars
+        lines = detail.split("\n") if detail else [""]
+        if len(lines) == 1:
+            # Single line: just use └
+            return f"\n{action}\n └ {lines[0]}\n"
+        else:
+            # Multiple lines: use │ for all but last, └ for last
+            formatted_lines = []
+            for i, line in enumerate(lines):
+                if i < len(lines) - 1:
+                    formatted_lines.append(f" │ {line}")
+                else:
+                    formatted_lines.append(f" └ {line}")
+            return f"\n{action}\n" + "\n".join(formatted_lines) + "\n"
 
     def _on_http_chunk(self, text: str):
         """Handle a streaming chunk from an HTTP provider (main thread)."""

@@ -460,21 +460,30 @@ class ChatCanvas(Gtk.DrawingArea):
     def _visual_rows_for_line(self, line_idx: int, content_width_px: float) -> int:
         """Return the number of visual rows needed to display *line_idx*.
 
-        A line that fits within *content_width_px* pixels needs 1 row.
-        Longer lines need ceil(line_pixel_width / content_width_px) rows.
-        Empty lines always need 1 row.
+        Uses the exact same row-splitting logic as the layout cache in
+        ``_draw_line`` to guarantee the wrap map is consistent with what
+        is actually rendered.  A mismatch between the two would cause
+        cumulative offset drift, making lines appear at wrong Y positions
+        and causing some content to disappear from the viewport during
+        resize.
         """
         if content_width_px <= 0:
             return 1
         text = self._buffer.get_line_text(line_idx)
         if not text:
             return 1
-        line_w = 0.0
+        rows = 1
+        row_w = 0.0
+        has_content = False
         for ch in text:
-            line_w += display_width(ch) * self._char_width
-        if line_w <= content_width_px:
-            return 1
-        return max(1, -(-int(line_w) // int(content_width_px)))  # ceil division
+            ch_w = display_width(ch) * self._char_width
+            if has_content and row_w + ch_w > content_width_px + 0.5:
+                rows += 1
+                row_w = ch_w
+            else:
+                row_w += ch_w
+            has_content = True
+        return rows
 
     def _rebuild_wrap_map(self, viewport_width: float):
         """(Re)build the wrap map for the current buffer at *viewport_width*.
@@ -672,8 +681,12 @@ class ChatCanvas(Gtk.DrawingArea):
         else:
             scroll_y = self._get_scroll_y()
 
-        # Visible range in visual rows
-        _MARGIN = 5
+        # Visible range in visual rows.
+        # Use a generous margin to account for long wrapped lines where a
+        # single buffer line can span many visual rows — a tight margin
+        # could exclude the beginning of such a line even though its later
+        # rows fall within the viewport.
+        _MARGIN = 20
         visible_height = self._get_visible_height()
         first_visual = max(0, int(scroll_y / self._line_height) - _MARGIN)
         last_visual = int((scroll_y + visible_height) / self._line_height) + 1 + _MARGIN
@@ -1334,11 +1347,20 @@ class ChatCanvas(Gtk.DrawingArea):
         On macOS, background→foreground transitions can leave the vadjustment
         with stale page_size / upper values.  Forcing a height update + redraw
         ensures the full content is rendered.
+
+        IMPORTANT: We do NOT call _invalidate_wrap_map() here.  That would
+        set _total_visual_rows = 0, causing _update_content_height() to
+        fall back to a line-count-based height (ignoring soft-wrapping).
+        If the wrap map was recently built (e.g. by _do_restore_messages),
+        invalidating it creates a transient state where the content height
+        is too small, GTK clamps vadjustment.value, and the scroll position
+        is lost.  Instead, we clear the layout cache (cheap Pango re-render)
+        and let do_snapshot rebuild the wrap map if the width actually changed.
         """
         self._needs_height_update = True
-        self._invalidate_wrap_map()
-        self._eagerly_update_height()
         self._layout_cache.clear()
+        self._layout_cache_width = 0.0
+        self._eagerly_update_height()
         self._schedule_redraw()
 
     def _on_realize(self, widget):
@@ -1348,10 +1370,17 @@ class ChatCanvas(Gtk.DrawingArea):
             self._window_active_handler_id = root.connect("notify::is-active", self._on_window_active)
 
     def _on_window_active(self, window, pspec):
-        """Refresh rendering when the window regains focus (foreground)."""
+        """Refresh rendering when the window regains focus (foreground).
+
+        Like _on_map, avoids _invalidate_wrap_map() to prevent transient
+        wrong content heights that cause scroll position clamping.  The
+        layout cache is cleared so Pango re-renders at the current width,
+        and do_snapshot will rebuild the wrap map if the width changed.
+        """
         if window.get_property("is-active"):
             self._needs_height_update = True
-            self._invalidate_wrap_map()
+            self._layout_cache.clear()
+            self._layout_cache_width = 0.0
             self._eagerly_update_height()
             self._schedule_redraw()
 
@@ -1431,18 +1460,17 @@ class ChatCanvas(Gtk.DrawingArea):
             self._resize_scroll_anchor = None
             return False
 
-        # Update content height now that resize has stopped.
-        # This was deferred during resize to prevent GTK clamping.
-        self._update_content_height()
-        self._needs_height_update = False
+        # Compute the target scroll position from the anchor BEFORE
+        # updating content height, because _update_content_height()
+        # calls set_size_request() which can trigger GTK layout and
+        # clamp vadj.value.  We need the target computed from the
+        # current (accurate) wrap map state.
+        visual_rows = self._total_visual_rows if self._total_visual_rows > 0 else self._buffer.get_line_count()
+        new_content_height = visual_rows * self._line_height + self.PAD_TOP * 2
+        new_content_height = max(new_content_height, 100)
+        page_size = vadj.get_page_size()
+        max_val = max(float(new_content_height) - page_size, 0)
 
-        # Force vadjustment.upper to match the new content height
-        _, content_height = self.get_size_request()
-        if content_height > 0:
-            vadj.set_upper(float(content_height))
-
-        # Compute the target scroll position from the anchor
-        max_val = max(vadj.get_upper() - vadj.get_page_size(), 0)
         if anchor["at_bottom"]:
             target = max_val
         else:
@@ -1450,6 +1478,18 @@ class ChatCanvas(Gtk.DrawingArea):
             target = line_y + anchor["anchor_offset"]
 
         target = max(0.0, min(target, max_val))
+
+        # Now update content height. This may trigger GTK layout and
+        # clamp vadj.value, but we've already computed our target.
+        self._update_content_height()
+        self._needs_height_update = False
+
+        # Force vadjustment.upper to match the new content height
+        vadj.set_upper(float(new_content_height))
+
+        # Re-clamp target against the (now-final) adjustment bounds
+        final_max = max(vadj.get_upper() - vadj.get_page_size(), 0)
+        target = max(0.0, min(target, final_max))
 
         # Clear the anchor BEFORE setting value so the value-changed
         # signal handler uses normal (non-anchor) scrolling.
