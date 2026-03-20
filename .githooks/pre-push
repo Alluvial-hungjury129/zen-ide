@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Pre-push hook: runs 'make lint' before pushing
+# If linting fails, the push is aborted
+#
+
+echo "🔍 Running 'make lint' before push..."
+
+if ! make lint; then
+    echo ""
+    echo "❌ Linting failed! Push aborted."
+    echo "   Fix the linting errors and try again."
+    echo "   To skip this check, use: git push --no-verify"
+    exit 1
+fi
+
+echo "✅ Linting passed! Proceeding with push..."
+exit 0

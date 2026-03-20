@@ -1,15 +1,12 @@
 # Zen IDE
 
-<div align="left">
-    
+<div align="left">    
+  
   [![Build](https://github.com/4mux/zen-ide/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/4mux/zen-ide/actions/workflows/build.yml)
   
   A minimalist and opinionated IDE built with Python and [GTK4](https://gitlab.gnome.org/GNOME/gtk).
   
-
 </div>
-
-
 
 ## Screenshots
 
@@ -38,7 +35,18 @@
 - **Vim-Style UI** — Neovim-style floating popups, j/k navigation, context menus
 - **Session Restore** — Reopens last files, layout, and panel positions on startup
 
+### Platforms
+
+- **macOS** — ✅ Supported
+- **Debian Linux** — ✅ Supported
+
 ## Quick Start
+
+### Requirements
+
+- Python 3.14+, [uv](https://docs.astral.sh/uv/getting-started/installation), macOS (Homebrew) or Linux (apt)
+
+Then you can run
 
 ```bash
 make install   # installs everything: GTK4 system deps, Python venv, dev tools, and the 'zen' CLI command
@@ -52,24 +60,10 @@ zen .                                 # open current directory
 zen file.py                           # open a file
 zen ~/projects/my-app.zen-workspace   # open a workspace
 ```
-
-> If `~/.local/bin` is not in your PATH, add it:
-> ```bash
-> export PATH="$HOME/.local/bin:$PATH"
-> ```
-
-### Platform Support
-
-- **macOS** — ✅ Officially supported
-- **Linux** — ✅ Supported
-
-### Requirements
-
-- Python 3.14+, [uv](https://docs.astral.sh/uv/getting-started/installation), macOS (Homebrew) or Linux (apt)
-
 ## Supported Languages
 
-Syntax highlighting via GtkSourceView built-in specs (100+ languages). Smart features (autocomplete, semantic highlighting) for Python, JavaScript/TypeScript, and Terraform.
+Smart features (autocomplete, semantic highlighting) for Python, JavaScript/TypeScript, and Terraform.
+Syntax highlighting via GtkSourceView built-in specs (100+ languages). .
 
 > See [`docs/2026_02_20_supported_formats.md`](docs/2026_02_20_supported_formats.md) for the full reference including viewer modes, file detection, and feature levels.
 
@@ -97,11 +91,13 @@ make clean          # Remove build artifacts
 
 ## Keyboard Shortcuts
 
-Press `Ctrl+?` inside the IDE to see all shortcuts.
+Press `Cmd+Shift+/` (macOS) or `Ctrl+Shift+/` (Linux) inside the IDE to see all shortcuts.
 
 ## Configuration
 
-Settings are stored in `~/.zen_ide/settings.json`. See `docs/2026_02_12_settings_reference.md` for details.
+Settings are stored in `~/.zen_ide/settings.json` which auto-generates on the first start.
+
+See `docs/2026_02_12_settings_reference.md` for details.
 
 ## License
 
@@ -110,4 +106,5 @@ Settings are stored in `~/.zen_ide/settings.json`. See `docs/2026_02_12_settings
 ### Third-Party Notices
 
 Zen IDE bundles **ZenIcons.ttf**, a subset font derived from [Nerd Fonts](https://www.nerdfonts.com/). 
-It includes glyphs from Devicons, Font Awesome Free, Material Design Icons, Codicons, Octicons, and Powerline — each under their respective open-source licenses. See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) for full details.
+
+See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) for full details.

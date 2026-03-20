@@ -14,6 +14,7 @@ import json
 import os
 import socket
 import threading
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -227,8 +228,18 @@ class AnthropicHTTPProvider:
         on_tool_use,
     ):
         """Execute a streaming API request in a background thread."""
+        from shared.ai_debug_log import ai_log
 
         def run():
+            t0 = time.monotonic()
+            stream_error_type = ""
+            ai_log.request(
+                "anthropic",
+                self._model,
+                msg_count=len(messages),
+                has_tools=bool(self._tools),
+                max_tokens=self._max_tokens,
+            )
             try:
                 body = {
                     "model": self._model,
@@ -289,8 +300,9 @@ class AnthropicHTTPProvider:
                         if self._stop_requested:
                             break
                         continue  # Keep waiting for data
-                    except OSError:
-                        # Connection closed or broken
+                    except OSError as e:
+                        stream_error_type = f"OSError: {e}"
+                        ai_log.event("stream_oserror", f"anthropic: {e}")
                         break
 
                     if not raw_line:
@@ -317,9 +329,32 @@ class AnthropicHTTPProvider:
                                 stop_reason = result["_stop_reason"]
 
                 self._current_response = None
+                duration = time.monotonic() - t0
 
                 if self._stop_requested:
+                    ai_log.event("stream_stopped", "anthropic: user cancelled")
                     return
+
+                # Detect abnormal stream end: no stop_reason + empty response
+                if not stop_reason and not self._text_response.strip() and not self._tool_calls:
+                    error_detail = stream_error_type or "stream ended with no data"
+                    ai_log.stream_end(
+                        "anthropic",
+                        stop_reason="",
+                        response_len=0,
+                        duration_s=duration,
+                        error_type=error_detail,
+                    )
+                    if on_error:
+                        on_error(f"Connection lost — server stopped responding ({error_detail})")
+                    return
+
+                ai_log.stream_end(
+                    "anthropic",
+                    stop_reason=stop_reason or "end_of_stream",
+                    response_len=len(self._text_response),
+                    duration_s=duration,
+                )
 
                 if stop_reason == "tool_use" and self._tool_calls and on_tool_use:
                     on_tool_use(self._tool_calls, self._text_response)
@@ -328,6 +363,7 @@ class AnthropicHTTPProvider:
 
             except urllib.error.HTTPError as e:
                 self._current_response = None
+                duration = time.monotonic() - t0
                 error_body = ""
                 try:
                     error_body = e.read().decode("utf-8", errors="replace")
@@ -343,10 +379,12 @@ class AnthropicHTTPProvider:
                 elif e.code == 529:
                     error_msg = f"Anthropic API overloaded. {error_msg}"
 
+                ai_log.error(error_msg, provider="anthropic", http_status=e.code)
                 if on_error:
                     on_error(error_msg)
             except Exception as e:
                 self._current_response = None
+                ai_log.error(str(e), provider="anthropic")
                 if not self._stop_requested and on_error:
                     on_error(str(e))
 

@@ -1651,6 +1651,10 @@ class AIChatTerminalView(Gtk.Box):
                 inp = tc.get("input", {})
                 tc_id = tc.get("id", "")
 
+                from shared.ai_debug_log import ai_log
+
+                ai_log.tool_use(name, inp)
+
                 # Accumulate for persistence so resize re-render can replay them
                 self._current_tool_calls.append({"name": name, "input": inp})
 
@@ -1673,11 +1677,17 @@ class AIChatTerminalView(Gtk.Box):
                 try:
                     for pc in prepared_calls:
                         result = executor.execute(pc["name"], pc["input"])
+                        from shared.ai_debug_log import ai_log
+
+                        ai_log.tool_result(pc["name"], ok=True, chars=len(result) if result else 0)
                         if is_anthropic:
                             tool_results.append({"tool_use_id": pc["id"], "content": result})
                         else:
                             tool_results.append({"tool_call_id": pc["id"], "content": result})
                 except Exception as e:
+                    from shared.ai_debug_log import ai_log
+
+                    ai_log.tool_result(pc["name"] if prepared_calls else "unknown", ok=False)
                     GLib.idle_add(self._on_tool_execution_error, e)
                     return
 
@@ -1787,6 +1797,9 @@ class AIChatTerminalView(Gtk.Box):
         if not self._is_processing:
             return
         try:
+            from shared.ai_debug_log import ai_log
+
+            ai_log.error(error_msg, provider=self._current_provider or "unknown")
             self._stop_spinner()
             self._append_text(f"\n[Error: {error_msg}]\n")
             self.messages.append({"role": "assistant", "content": f"[Error: {error_msg}]"})
@@ -2345,6 +2358,9 @@ class AIChatTerminalView(Gtk.Box):
 
         elapsed = time.monotonic() - getattr(self, "_last_data_time", time.monotonic())
         if elapsed >= _STALE_REQUEST_TIMEOUT_S:
+            from shared.ai_debug_log import ai_log
+
+            ai_log.event("stale_watchdog", f"cancelled after {elapsed:.0f}s with no data")
             print(f"[ZenIDE] Stale request detected ({elapsed:.0f}s with no data), cancelling")
             self._stop_spinner()
             self._append_text(f"\n[Request timed out — no response for {int(elapsed)}s]\n")

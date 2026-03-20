@@ -409,12 +409,23 @@ class CopilotHTTPProvider:
 
     def _stream_request(self, on_chunk, on_complete, on_error, on_tool_use):
         """Execute a streaming API request in a background thread."""
+        from shared.ai_debug_log import ai_log
 
         def run():
+            t0 = time.monotonic()
+            stream_error_type = ""
+            ai_log.request(
+                "copilot",
+                self._model,
+                msg_count=len(self._conversation),
+                has_tools=bool(self._tools),
+                max_tokens=self._max_tokens,
+            )
             try:
                 session_token = self._get_session_token()
                 if not session_token:
                     detail = self._last_error or "unknown error"
+                    ai_log.error(f"session token failure: {detail}", provider="copilot")
                     if on_error:
                         on_error(f"Failed to get Copilot session token: {detail}")
                     return
@@ -478,8 +489,9 @@ class CopilotHTTPProvider:
                         if self._stop_requested:
                             break
                         continue  # Keep waiting for data
-                    except OSError:
-                        # Connection closed or broken
+                    except OSError as e:
+                        stream_error_type = f"OSError: {e}"
+                        ai_log.event("stream_oserror", f"copilot: {e}")
                         break
 
                     if not raw_line:
@@ -505,8 +517,10 @@ class CopilotHTTPProvider:
                                 finish_reason = result["_finish_reason"]
 
                 self._current_response = None
+                duration = time.monotonic() - t0
 
                 if self._stop_requested:
+                    ai_log.event("stream_stopped", "copilot: user cancelled")
                     return
 
                 # Pick up any pending finish_reason that was deferred because
@@ -530,6 +544,27 @@ class CopilotHTTPProvider:
                                 "input": inp,
                             }
                         )
+
+                # Detect abnormal stream end: no finish_reason + empty response
+                if not finish_reason and not self._text_response.strip() and not self._tool_calls:
+                    error_detail = stream_error_type or "stream ended with no data"
+                    ai_log.stream_end(
+                        "copilot",
+                        stop_reason="",
+                        response_len=0,
+                        duration_s=duration,
+                        error_type=error_detail,
+                    )
+                    if on_error:
+                        on_error(f"Connection lost — server stopped responding ({error_detail})")
+                    return
+
+                ai_log.stream_end(
+                    "copilot",
+                    stop_reason=finish_reason or "end_of_stream",
+                    response_len=len(self._text_response),
+                    duration_s=duration,
+                )
 
                 if finish_reason == "tool_calls" and self._tool_calls and on_tool_use:
                     on_tool_use(self._tool_calls, self._text_response)
@@ -557,10 +592,12 @@ class CopilotHTTPProvider:
                 elif e.code == 429:
                     error_msg = f"Rate limited. {error_msg}"
 
+                ai_log.error(error_msg, provider="copilot", http_status=e.code)
                 if on_error:
                     on_error(error_msg)
             except Exception as e:
                 self._current_response = None
+                ai_log.error(str(e), provider="copilot")
                 if not self._stop_requested and on_error:
                     on_error(str(e))
 
