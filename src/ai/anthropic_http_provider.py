@@ -264,7 +264,7 @@ class AnthropicHTTPProvider:
                 )
 
                 self._current_response = urllib.request.urlopen(req, timeout=300)
-                
+
                 # Set socket-level read timeout to prevent blocking forever.
                 # The urlopen timeout only covers the connection handshake.
                 # This ensures individual read() calls will time out, allowing
@@ -274,14 +274,14 @@ class AnthropicHTTPProvider:
                     sock.settimeout(_SOCKET_READ_TIMEOUT_S)
                 except Exception:
                     pass  # Socket access may fail on some platforms; continue anyway
-                
+
                 buffer = ""
                 stop_reason = None
 
                 while True:
                     if self._stop_requested:
                         break
-                    
+
                     try:
                         raw_line = self._current_response.readline()
                     except socket.timeout:
@@ -292,7 +292,7 @@ class AnthropicHTTPProvider:
                     except OSError:
                         # Connection closed or broken
                         break
-                    
+
                     if not raw_line:
                         # End of stream
                         break
