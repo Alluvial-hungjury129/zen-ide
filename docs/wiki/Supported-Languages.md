@@ -74,4 +74,4 @@ Certain file types open with a visual preview alongside (or instead of) the text
 
 ## Custom Language Specs
 
-Zen IDE bundles a custom GtkSourceView language spec for **Clojure** (not available in the standard GtkSourceView distribution). Additional `.lang` files can be added to `src/langs/`.
+Zen IDE bundles a custom GtkSourceView language spec for **Clojure** (not available in the standard GtkSourceView distribution). Additional `.lang` files can be added to `src/editor/langs/`.

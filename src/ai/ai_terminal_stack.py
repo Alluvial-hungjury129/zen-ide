@@ -402,6 +402,13 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
             self._tab_buttons[view_idx].set_title(title)
 
     def _on_processing_changed(self, view_idx: int, processing: bool) -> None:
+        if self._vertical_mode:
+            if 0 <= view_idx < len(self._views):
+                if processing:
+                    self._start_header_spinner(view_idx)
+                else:
+                    self._stop_header_spinner(view_idx)
+            return
         if view_idx < 0 or view_idx >= len(self._tab_buttons):
             return
         if processing:
@@ -433,6 +440,31 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
             btn = self._tab_buttons[view_idx]
             btn.close_btn.set_label("\u00d7")
             btn.close_btn.set_visible(btn._show_close)
+
+    # -- vertical-mode spinner (header label) --
+
+    def _start_header_spinner(self, view_idx: int) -> None:
+        self._stop_header_spinner(view_idx)
+        spinner = Spinner()
+        lbl = self._views[view_idx]._ai_header.spinner_label
+        lbl.set_visible(True)
+
+        def tick():
+            if view_idx not in self._spinners:
+                return False
+            lbl.set_label(spinner.spin())
+            return True
+
+        timeout_id = GLib.timeout_add(80, tick)
+        self._spinners[view_idx] = {"spinner": spinner, "timeout_id": timeout_id}
+        lbl.set_label(spinner.spin())
+
+    def _stop_header_spinner(self, view_idx: int) -> None:
+        state = self._spinners.pop(view_idx, None)
+        if state:
+            GLib.source_remove(state["timeout_id"])
+        if 0 <= view_idx < len(self._views):
+            self._views[view_idx]._ai_header.spinner_label.set_visible(False)
 
     def _on_view_maximize(self, name: str) -> None:
         if self.on_maximize:

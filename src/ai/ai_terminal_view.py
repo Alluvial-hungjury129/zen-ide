@@ -130,6 +130,9 @@ class AITerminalView(TerminalView):
         self._title_inferred = False
         self._waiting_for_response = False
         self._commit_ready = False  # ignore commit signals until CLI is ready
+        self._in_escape_seq = False  # inside a VTE escape sequence
+        self._idle_poll_id: int = 0  # GLib timer for PTY idle detection
+        self._last_contents_serial: int = 0  # bumped on contents-changed
         self._session_id: str | None = None  # Claude CLI session ID for resume
         self._resume_attempted = False  # True while a --resume spawn is settling
         self._resume_spawn_time: float = 0.0
@@ -170,6 +173,7 @@ class AITerminalView(TerminalView):
         self._configure_terminal()
         scrolled.set_child(self.terminal)
         self._commit_handler_id = self.terminal.connect("commit", self._on_vte_commit)
+        self.terminal.connect("contents-changed", self._on_contents_changed)
 
         self._is_maximized = False
         self.on_maximize = None
@@ -305,6 +309,7 @@ class AITerminalView(TerminalView):
         # queries whose responses arrive via the commit signal and would
         # otherwise be captured as user input (the "Op Vte 7600 …" garbage).
         self._commit_ready = False
+        self._in_escape_seq = False
         self._input_buf.clear()
 
         self.terminal.spawn_async(
@@ -469,6 +474,8 @@ class AITerminalView(TerminalView):
         self._title_inferred = False
         self._waiting_for_response = False
         self._commit_ready = False
+        self._in_escape_seq = False
+        self._stop_idle_poll()
         self._input_buf.clear()
         if callable(self.on_processing_changed):
             self.on_processing_changed(False)
@@ -633,6 +640,19 @@ class AITerminalView(TerminalView):
         if not self._commit_ready:
             return
         for ch in text:
+            # Skip escape sequences (e.g. focus-in/out \x1b[I / \x1b[O,
+            # cursor reports, bracketed-paste markers) so their trailing
+            # printable bytes aren't mistaken for real user input.
+            if ch == "\x1b":
+                self._in_escape_seq = True
+                continue
+            if self._in_escape_seq:
+                # CSI sequences end at an alpha char; other ESC sequences
+                # are two bytes (ESC + one char).
+                if ch.isalpha() or ch == "~":
+                    self._in_escape_seq = False
+                continue
+
             if ch in ("\r", "\n"):
                 user_text = "".join(self._input_buf).strip()
                 # Strip leftover escape sequence fragments (e.g. terminal
@@ -643,6 +663,7 @@ class AITerminalView(TerminalView):
                     # Start spinner — CLI is now processing
                     if not self._waiting_for_response:
                         self._waiting_for_response = True
+                        self._start_idle_poll()
                         if callable(self.on_processing_changed):
                             self.on_processing_changed(True)
 
@@ -659,6 +680,7 @@ class AITerminalView(TerminalView):
                     self._input_buf.pop()
                 if self._waiting_for_response:
                     self._waiting_for_response = False
+                    self._stop_idle_poll()
                     if callable(self.on_processing_changed):
                         self.on_processing_changed(False)
             elif ch >= " ":  # printable characters only
@@ -666,8 +688,60 @@ class AITerminalView(TerminalView):
                 # User is typing again — CLI returned to prompt, stop spinner
                 if self._waiting_for_response:
                     self._waiting_for_response = False
+                    self._stop_idle_poll()
                     if callable(self.on_processing_changed):
                         self.on_processing_changed(False)
+
+    # ------------------------------------------------------------------
+    # PTY idle detection — stop spinner when CLI waits for input
+    # ------------------------------------------------------------------
+
+    def _on_contents_changed(self, _terminal) -> None:
+        """Track that the CLI is still producing output."""
+        self._last_contents_serial += 1
+
+    def _start_idle_poll(self) -> None:
+        """Begin polling the PTY to detect when the CLI becomes idle."""
+        self._stop_idle_poll()
+        self._last_contents_serial = 0
+        self._idle_prev_serial = -1
+        self._idle_poll_id = GLib.timeout_add(500, self._check_idle)
+
+    def _stop_idle_poll(self) -> None:
+        if self._idle_poll_id:
+            GLib.source_remove(self._idle_poll_id)
+            self._idle_poll_id = 0
+
+    def _check_idle(self) -> bool:
+        """Periodically check whether the CLI process is waiting for input."""
+        if not self._waiting_for_response:
+            self._idle_poll_id = 0
+            return False
+
+        # If terminal content changed since last tick, CLI is still producing
+        # output — keep waiting.
+        if self._last_contents_serial != self._idle_prev_serial:
+            self._idle_prev_serial = self._last_contents_serial
+            return True  # keep polling
+
+        # Content has been stable for one poll interval.  Ask the OS whether
+        # the CLI process is the PTY foreground group (i.e. it is the one
+        # reading from the terminal, not a tool subprocess).
+        try:
+            pty = self.terminal.get_pty()
+            if pty is None:
+                return True
+            fd = pty.get_fd()
+            fg_pgid = os.tcgetpgrp(fd)
+            if fg_pgid == self.shell_pid:
+                self._waiting_for_response = False
+                self._idle_poll_id = 0
+                if callable(self.on_processing_changed):
+                    self.on_processing_changed(False)
+                return False
+        except OSError:
+            pass
+        return True  # keep polling
 
     # ------------------------------------------------------------------
     # Interface expected by window modules

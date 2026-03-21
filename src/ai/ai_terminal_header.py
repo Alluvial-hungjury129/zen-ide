@@ -38,6 +38,11 @@ class AITerminalHeader:
         self.header_btn.add_css_class("terminal-header-btn")
         self.box.append(self.header_btn)
 
+        self.spinner_label = Gtk.Label(label="")
+        self.spinner_label.set_margin_start(6)
+        self.spinner_label.set_visible(False)
+        self.box.append(self.spinner_label)
+
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
         self.box.append(spacer)
