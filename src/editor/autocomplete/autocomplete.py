@@ -140,7 +140,7 @@ class Autocomplete:
         if self._css_provider is None:
             self._css_provider = Gtk.CssProvider()
             css = f"""
-                window.autocomplete-popup .autocomplete-row {{
+                .zen-autocomplete .autocomplete-row {{
                     padding: 3px 10px;
                     color: {theme.fg_color};
                     font-family: '{font_family}';
@@ -148,38 +148,38 @@ class Autocomplete:
                     border-radius: 0;
                     min-height: 22px;
                 }}
-                window.autocomplete-popup row:selected .autocomplete-row,
-                window.autocomplete-popup .autocomplete-row.selected {{
+                .zen-autocomplete row:selected .autocomplete-row,
+                .zen-autocomplete .autocomplete-row.selected {{
                     background: {theme.selection_bg};
                     color: {theme.fg_color};
                 }}
-                window.autocomplete-popup row:selected {{
+                .zen-autocomplete row:selected {{
                     background: {theme.selection_bg};
                     outline: 1px solid {theme.accent_color};
                     outline-offset: -1px;
                     border-radius: {border_radius}px;
                 }}
-                window.autocomplete-popup row:focus,
-                window.autocomplete-popup row:focus-visible,
-                window.autocomplete-popup row:focus-within {{
+                .zen-autocomplete row:focus,
+                .zen-autocomplete row:focus-visible,
+                .zen-autocomplete row:focus-within {{
                     outline: none;
                     border: none;
                     box-shadow: none;
                 }}
-                window.autocomplete-popup listbox:focus,
-                window.autocomplete-popup listbox:focus-visible {{
+                .zen-autocomplete listbox:focus,
+                .zen-autocomplete listbox:focus-visible {{
                     outline: none;
                     border: none;
                     box-shadow: none;
                 }}
-                window.autocomplete-popup .autocomplete-sig-box {{
+                .zen-autocomplete .autocomplete-sig-box {{
                     padding: 4px 6px;
                 }}
-                window.autocomplete-popup .autocomplete-sig-box textview text {{
+                .zen-autocomplete .autocomplete-sig-box textview text {{
                     background-color: {theme.panel_bg};
                     color: {theme.fg_color};
                 }}
-                window.autocomplete-popup .autocomplete-sig-box textview.view {{
+                .zen-autocomplete .autocomplete-sig-box textview.view {{
                     background-color: {theme.panel_bg};
                 }}
             """
@@ -189,6 +189,7 @@ class Autocomplete:
             )
 
         self._hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        self._hbox.add_css_class("zen-autocomplete")
         self._hbox.set_size_request(700, 350)
 
         scrolled = Gtk.ScrolledWindow()

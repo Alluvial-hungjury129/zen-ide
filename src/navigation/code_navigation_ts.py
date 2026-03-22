@@ -11,7 +11,6 @@ Supports:
 
 import json
 import os
-import re
 from typing import Optional
 
 _TS_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".d.ts"]
@@ -70,6 +69,15 @@ class TypeScriptNavigationMixin:
         "exports",
     }
 
+    @property
+    def _ts_js(self):
+        """Lazy-loaded Tree-sitter TS/JS provider."""
+        if not hasattr(self, "_ts_ts_provider"):
+            from .tree_sitter_ts_provider import TreeSitterTsProvider
+
+            self._ts_ts_provider = TreeSitterTsProvider()
+        return self._ts_ts_provider
+
     def _handle_ts_click(self, buffer, view, file_path, click_iter) -> bool:
         """Handle Cmd+Click for TypeScript/JavaScript files."""
         word = self._get_word_at_iter(buffer, click_iter)
@@ -80,7 +88,7 @@ class TypeScriptNavigationMixin:
             return False
 
         content = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), True)
-        imports = self._parse_ts_imports(content)
+        imports = self._ts_js.parse_imports(content)
 
         # Detect dotted access (e.g., EnumName.Member)
         chain = self._get_chain_at_iter(buffer, click_iter)
@@ -104,7 +112,7 @@ class TypeScriptNavigationMixin:
                         return True
 
             # Container defined locally — find member in current file
-            member_line = self._find_ts_member_in_content(content, container, member)
+            member_line = self._ts_js.find_member_in_content(content, container, member)
             if member_line:
                 self._navigate_to_line(buffer, view, member_line, symbol=member)
                 return True
@@ -119,133 +127,13 @@ class TypeScriptNavigationMixin:
             return self._navigate_to_ts_import(word, source, file_path)
 
         # Case 2: Local definition in current file
-        line_num = self._find_ts_symbol_in_content(content, word)
+        line_num = self._ts_js.find_symbol_in_content(content, word)
         if line_num:
             self._navigate_to_line(buffer, view, line_num, symbol=word)
             return True
 
         # Case 3: Search workspace files
         return self._search_ts_workspace(word, file_path)
-
-    def _parse_ts_imports(self, content: str) -> dict:
-        """Parse TypeScript/JavaScript import statements."""
-        imports = {}
-
-        # ES module imports: import ... from 'module'
-        for match in re.finditer(
-            r"""^import\s+(.+?)\s+from\s+['"]([^'"]+)['"]""",
-            content,
-            re.MULTILINE,
-        ):
-            clause = match.group(1).strip()
-            source = match.group(2)
-            self._parse_ts_import_clause(clause, source, imports)
-
-        # CommonJS: const { x } = require('module')
-        for match in re.finditer(
-            r"""(?:const|let|var)\s+(\{[^}]+\}|\w+)\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)""",
-            content,
-            re.MULTILINE,
-        ):
-            clause = match.group(1).strip()
-            source = match.group(2)
-            if clause.startswith("{"):
-                inner = clause.strip("{}")
-                for item in inner.split(","):
-                    item = item.strip()
-                    if not item:
-                        continue
-                    as_match = re.match(r"(\w+)\s*:\s*(\w+)", item)
-                    if as_match:
-                        imports[as_match.group(2)] = source
-                    else:
-                        name_match = re.match(r"(\w+)", item)
-                        if name_match:
-                            imports[name_match.group(1)] = source
-            else:
-                imports[clause] = source
-
-        # Re-exports: export { x } from 'module'
-        for match in re.finditer(
-            r"""^export\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]""",
-            content,
-            re.MULTILINE,
-        ):
-            inner = match.group(1)
-            source = match.group(2)
-            for item in inner.split(","):
-                item = item.strip()
-                if not item:
-                    continue
-                as_match = re.match(r"(\w+)\s+as\s+(\w+)", item)
-                if as_match:
-                    imports[as_match.group(2)] = source
-                else:
-                    name_match = re.match(r"(\w+)", item)
-                    if name_match:
-                        imports[name_match.group(1)] = source
-
-        return imports
-
-    def _parse_ts_import_clause(self, clause: str, source: str, imports: dict):
-        """Parse the clause part of an ES module import statement."""
-        # import * as name from 'source'
-        ns_match = re.match(r"\*\s+as\s+(\w+)", clause)
-        if ns_match:
-            imports[ns_match.group(1)] = source
-            return
-
-        # Split by comma outside braces
-        brace_depth = 0
-        parts = []
-        current = []
-        for ch in clause:
-            if ch == "{":
-                brace_depth += 1
-                current.append(ch)
-            elif ch == "}":
-                brace_depth -= 1
-                current.append(ch)
-            elif ch == "," and brace_depth == 0:
-                parts.append("".join(current).strip())
-                current = []
-            else:
-                current.append(ch)
-        if current:
-            parts.append("".join(current).strip())
-
-        for part in parts:
-            part = part.strip()
-            if not part:
-                continue
-
-            # Named imports: { a, b as c }
-            brace_match = re.match(r"\{(.+)\}", part, re.DOTALL)
-            if brace_match:
-                inner = brace_match.group(1)
-                for item in inner.split(","):
-                    item = item.strip()
-                    if not item:
-                        continue
-                    as_match = re.match(r"(\w+)\s+as\s+(\w+)", item)
-                    if as_match:
-                        imports[as_match.group(2)] = source
-                    else:
-                        name_match = re.match(r"(\w+)", item)
-                        if name_match:
-                            imports[name_match.group(1)] = source
-                continue
-
-            # Namespace: * as name
-            ns_match = re.match(r"\*\s+as\s+(\w+)", part)
-            if ns_match:
-                imports[ns_match.group(1)] = source
-                continue
-
-            # Default import: just an identifier
-            id_match = re.match(r"^(\w+)$", part)
-            if id_match:
-                imports[id_match.group(1)] = source
 
     def _resolve_ts_module(self, source: str, current_file: str) -> Optional[str]:
         """Resolve a TypeScript/JavaScript module source to a file path."""
@@ -380,69 +268,12 @@ class TypeScriptNavigationMixin:
         self._schedule_pending_navigation()
         return True
 
-    def _find_ts_symbol_in_content(self, content: str, symbol: str) -> Optional[int]:
-        """Find a TypeScript/JavaScript symbol definition. Returns 1-based line number."""
-        patterns = [
-            rf"^\s*(?:export\s+)?(?:async\s+)?function\s+{re.escape(symbol)}\s*[<(]",
-            rf"^\s*(?:export\s+)?(?:abstract\s+)?class\s+{re.escape(symbol)}\b",
-            rf"^\s*(?:export\s+)?interface\s+{re.escape(symbol)}\b",
-            rf"^\s*(?:export\s+)?type\s+{re.escape(symbol)}\b",
-            rf"^\s*(?:export\s+)?(?:const\s+)?enum\s+{re.escape(symbol)}\b",
-            rf"^\s*(?:export\s+)?(?:const|let|var)\s+{re.escape(symbol)}\b",
-            rf"^\s+(?:(?:public|private|protected|static|async|readonly)\s+)*{re.escape(symbol)}\s*[\(<]",
-            rf"^\s*export\s+default\s+(?:async\s+)?function\s+{re.escape(symbol)}\b",
-            rf"^\s*export\s+default\s+class\s+{re.escape(symbol)}\b",
-        ]
-
-        for pattern in patterns:
-            match = re.search(pattern, content, re.MULTILINE)
-            if match:
-                matched_text = match.group()
-                symbol_offset = matched_text.find(symbol)
-                if symbol_offset >= 0:
-                    pos = match.start() + symbol_offset
-                else:
-                    pos = match.start()
-                return content[:pos].count("\n") + 1
-
-        return None
-
-    def _find_ts_member_in_content(self, content: str, container: str, member: str) -> Optional[int]:
-        """Find a member inside a TS container (enum, class, namespace).
-
-        Returns 1-based line number of the member definition.
-        """
-        lines = content.split("\n")
-
-        container_re = re.compile(
-            rf"^\s*(?:export\s+)?(?:declare\s+)?(?:const\s+)?(?:enum|class|namespace|abstract\s+class)\s+{re.escape(container)}\b"
-        )
-        member_re = re.compile(rf"\b{re.escape(member)}\b")
-
-        in_container = False
-        brace_depth = 0
-
-        for i, line in enumerate(lines):
-            if not in_container:
-                if container_re.match(line):
-                    in_container = True
-                    brace_depth += line.count("{") - line.count("}")
-                    continue
-            else:
-                brace_depth += line.count("{") - line.count("}")
-                if member_re.search(line):
-                    return i + 1
-                if brace_depth <= 0:
-                    in_container = False
-
-        return None
-
     def _find_member_in_file(self, file_path: str, container: str, member: str) -> Optional[int]:
         """Read a file and find a member inside a container."""
         try:
             with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
-            return self._find_ts_member_in_content(content, container, member)
+            return self._ts_js.find_member_in_content(content, container, member)
         except (OSError, IOError):
             return None
 
@@ -491,7 +322,7 @@ class TypeScriptNavigationMixin:
                     content = fh.read()
             except (OSError, IOError):
                 continue
-            member_line = self._find_ts_member_in_content(content, container, member)
+            member_line = self._ts_js.find_member_in_content(content, container, member)
             if member_line:
                 self._pending_navigate_symbol = member
                 self._pending_file_path = f
@@ -549,7 +380,7 @@ class TypeScriptNavigationMixin:
                     content = fh.read()
             except (OSError, IOError):
                 continue
-            line_num = self._find_ts_symbol_in_content(content, symbol)
+            line_num = self._ts_js.find_symbol_in_content(content, symbol)
             if line_num:
                 self._pending_navigate_symbol = symbol
                 self._pending_file_path = f

@@ -9,7 +9,6 @@ Language-specific logic lives in:
 """
 
 import os
-import re
 from typing import Callable, Optional
 
 from gi.repository import GLib, Gtk, GtkSource
@@ -292,14 +291,13 @@ class CodeNavigation(PythonNavigationMixin, TerraformNavigationMixin, TypeScript
             return True
 
         # Check for re-export pattern (from .x import symbol)
-        reexport_match = re.search(
-            rf"^from\s+(\.+[a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)*)\s+import\s+(?:\([^)]*\b{re.escape(symbol)}\b[^)]*\)|[^(\n]*\b{re.escape(symbol)}\b)",
-            content,
-            re.MULTILINE,
-        )
-        if reexport_match:
-            line = content[: reexport_match.start()].count("\n") + 1
-            self._navigate_to_line(buffer, view, line, symbol=symbol)
+        if not hasattr(self, "_ts_py_provider"):
+            from .tree_sitter_py_provider import TreeSitterPyProvider
+
+            self._ts_py_provider = TreeSitterPyProvider()
+        import_line = self._ts_py_provider.find_import_line(content, symbol)
+        if import_line:
+            self._navigate_to_line(buffer, view, import_line, symbol=symbol)
             return True
 
         return False

@@ -3,6 +3,10 @@ Python completion provider for Zen IDE autocomplete.
 
 Provides Python-specific completions: keywords, builtins, imports, symbols,
 module path resolution, and dot-access member completions.
+
+Uses tree-sitter for AST-based symbol extraction (functions, classes,
+variables, imports, class members, signatures).  Filesystem-based module
+resolution and venv introspection remain unchanged.
 """
 
 import glob as glob_module
@@ -11,6 +15,21 @@ import re
 from pathlib import Path
 
 from editor.autocomplete import CompletionItem, CompletionKind
+from editor.autocomplete.tree_sitter_provider import (
+    _parse,
+    py_extract_class_members,
+    py_extract_definitions,
+    py_extract_file_symbols,
+    py_extract_imports,
+    py_extract_init_signature,
+    py_extract_self_members,
+    py_extract_signature,
+    py_find_enclosing_class,
+    py_find_function_signature,
+    py_find_method_signature,
+    py_resolve_chain,
+    py_resolve_variable_type,
+)
 
 # Python builtins
 PYTHON_BUILTINS = [
@@ -112,11 +131,14 @@ class PythonCompletionProvider:
         completions = []
         completions.extend(CompletionItem(kw, CompletionKind.KEYWORD) for kw in keyword.kwlist)
         completions.extend(CompletionItem(b, CompletionKind.BUILTIN) for b in PYTHON_BUILTINS)
-        imports = self._get_imports(buffer_text)
-        if file_path:
-            self._enrich_imports(imports, buffer_text, file_path)
-        completions.extend(imports)
-        completions.extend(self._get_symbols(buffer_text))
+
+        source, tree = _parse(buffer_text, "python")
+        if tree is not None:
+            imports = py_extract_imports(source, tree)
+            if file_path:
+                self._enrich_imports(imports, source, tree, file_path)
+            completions.extend(imports)
+            completions.extend(py_extract_definitions(source, tree))
         return completions
 
     def get_call_parameter_completions(self, buffer, cursor_iter, file_path, buffer_text):
@@ -130,9 +152,10 @@ class PythonCompletionProvider:
             return []
 
         func_chain, specified_kwargs, positional_count = ctx
-        cursor_offset = cursor_iter.get_offset()
 
-        sig = self._resolve_function_signature(func_chain, file_path, buffer_text, cursor_offset)
+        source, tree = _parse(buffer_text, "python")
+        sig = self._resolve_function_signature(func_chain, file_path, buffer_text, source, tree,
+                                                cursor_offset=cursor_iter.get_offset())
         if not sig:
             return []
 
@@ -298,132 +321,170 @@ class PythonCompletionProvider:
             args.append(remaining)
         return args
 
-    def _resolve_function_signature(self, func_chain, file_path, buffer_text, cursor_offset=None):
+    def _resolve_function_signature(self, func_chain, file_path, buffer_text, source=None, tree=None,
+                                     *, cursor_offset=None):
         """Resolve a function/method call chain to its signature string."""
-        normalized = self._normalize_multiline_defs(buffer_text)
+        if source is None or tree is None:
+            source, tree = _parse(buffer_text, "python")
+        if tree is None:
+            return None
+
         parts = func_chain.split(".")
 
         if len(parts) == 1:
-            return self._find_local_or_imported_signature(parts[0], file_path, normalized)
+            return self._find_local_or_imported_signature(parts[0], file_path, source, tree)
 
         method_name = parts[-1]
         first = parts[0]
 
         # Handle self/cls
         if first in ("self", "cls") and cursor_offset is not None:
-            class_name = self._find_enclosing_class(buffer_text, cursor_offset)
+            byte_offset = len(buffer_text[:cursor_offset].encode("utf-8"))
+            class_name = py_find_enclosing_class(source, tree, byte_offset)
             if class_name:
-                return self._find_method_signature_in_class(normalized, class_name, method_name)
+                return py_find_method_signature(source, tree, class_name, method_name)
             return None
 
-        # Try resolving variable type (e.g., obj = MyClass() → find MyClass.method)
-        resolved_class = self._resolve_variable_type(buffer_text, first)
+        # Try resolving variable type
+        resolved_class = py_resolve_variable_type(source, tree, first)
         if resolved_class:
-            sig = self._find_method_signature_in_class(normalized, resolved_class, method_name)
+            sig = py_find_method_signature(source, tree, resolved_class, method_name)
             if sig:
                 return sig
-            # Try imported class
-            sig = self._find_method_in_imported_class(resolved_class, method_name, buffer_text, file_path)
+            sig = self._find_method_in_imported_class(resolved_class, method_name, source, tree, file_path)
             if sig:
                 return sig
 
-        # Try as a direct class reference (e.g., ClassName.method)
-        sig = self._find_method_signature_in_class(normalized, first, method_name)
+        # Try as a direct class reference
+        sig = py_find_method_signature(source, tree, first, method_name)
         if sig:
             return sig
 
         # Try imported class.method
-        sig = self._find_method_in_imported_class(first, method_name, buffer_text, file_path)
+        sig = self._find_method_in_imported_class(first, method_name, source, tree, file_path)
         if sig:
             return sig
 
         return None
 
-    def _find_local_or_imported_signature(self, func_name, file_path, normalized_text):
+    def _find_local_or_imported_signature(self, func_name, file_path, source, tree):
         """Find function signature in local definitions or imports."""
-        # Search local definitions
-        m = re.search(
-            rf"^\s*def\s+{re.escape(func_name)}\s*(\([^)]*\))\s*(?:->\s*(.+?))?\s*:",
-            normalized_text,
-            re.MULTILINE,
-        )
-        if m:
-            sig = f"{func_name}{m.group(1)}"
-            if m.group(2):
-                sig += f" → {m.group(2).strip()}"
+        sig = py_find_function_signature(source, tree, func_name)
+        if sig:
             return sig
 
-        # Search for class constructor (ClassName())
-        if re.search(rf"^class\s+{re.escape(func_name)}\b", normalized_text, re.MULTILINE):
-            return self._extract_init_signature(normalized_text, func_name)
-
-        # Search imports
         if not file_path:
             return None
-        for im in re.finditer(r"^from\s+([\w.]+)\s+import\s+(.+?)$", normalized_text, re.MULTILINE):
-            module_path = im.group(1)
-            for name_part in im.group(2).strip("()").split(","):
-                name_part = name_part.strip()
-                if not name_part or name_part.startswith("#"):
-                    continue
-                alias_parts = name_part.split(" as ")
-                original = alias_parts[0].strip()
-                alias = alias_parts[-1].strip()
-                if alias == func_name:
-                    module_text = self._read_module_text(module_path, file_path)
-                    if module_text:
-                        module_text = self._normalize_multiline_defs(module_text)
-                        sig = self._find_local_or_imported_signature(original, None, module_text)
-                        if sig and original != func_name:
-                            # Replace original name with alias in signature
-                            sig = sig.replace(original, func_name, 1)
-                        return sig
+
+        # Search imports for the function name
+        module_info = self._find_import_module(source, tree, func_name)
+        if module_info:
+            module_path, original_name = module_info
+            module_text = self._read_module_text(module_path, file_path)
+            if module_text:
+                m_source, m_tree = _parse(module_text, "python")
+                if m_tree:
+                    sig = py_find_function_signature(m_source, m_tree, original_name)
+                    if sig and original_name != func_name:
+                        sig = sig.replace(original_name, func_name, 1)
+                    return sig
         return None
 
-    def _find_method_signature_in_class(self, text, class_name, method_name):
-        """Find a method's signature within a class body."""
-        body = self._get_class_body_text(text, class_name)
-        if not body:
-            return None
-        body = self._normalize_multiline_defs(body)
-        m = re.search(
-            rf"def\s+{re.escape(method_name)}\s*(\([^)]*\))\s*(?:->\s*(.+?))?\s*:",
-            body,
-        )
-        if m:
-            sig = f"{method_name}{m.group(1)}"
-            if m.group(2):
-                sig += f" → {m.group(2).strip()}"
-            return sig
-        return None
-
-    def _find_method_in_imported_class(self, class_name, method_name, buffer_text, file_path):
+    def _find_method_in_imported_class(self, class_name, method_name, source, tree, file_path):
         """Find a method signature in an imported class."""
         if not file_path:
             return None
-        for im in re.finditer(r"^from\s+([\w.]+)\s+import\s+(.+?)$", buffer_text, re.MULTILINE):
-            module_path = im.group(1)
-            for name_part in im.group(2).strip("()").split(","):
-                name_part = name_part.strip()
-                if not name_part or name_part.startswith("#"):
+
+        module_info = self._find_import_module(source, tree, class_name)
+        if not module_info:
+            return None
+
+        module_path, original_name = module_info
+        module_text = self._read_module_text(module_path, file_path)
+        if not module_text:
+            return None
+
+        m_source, m_tree = _parse(module_text, "python")
+        if m_tree:
+            sig = py_find_method_signature(m_source, m_tree, original_name, method_name)
+            if sig:
+                return sig
+            # Follow re-exports
+            sub_text = self._follow_reexport_ts(m_source, m_tree, original_name, module_path, file_path)
+            if sub_text:
+                s_source, s_tree = _parse(sub_text, "python")
+                if s_tree:
+                    sig = py_find_method_signature(s_source, s_tree, original_name, method_name)
+                    if sig:
+                        return sig
+        return None
+
+    @staticmethod
+    def _find_import_module(source, tree, name):
+        """Find the module path and original name for an imported symbol.
+
+        Returns (module_path, original_name) or None.
+        """
+        root = tree.root_node
+        from editor.autocomplete.tree_sitter_provider import _node_text
+
+        for child in root.children:
+            if child.type == "import_from_statement":
+                module_node = child.child_by_field_name("module_name")
+                if not module_node:
                     continue
-                alias_parts = name_part.split(" as ")
-                original = alias_parts[0].strip()
-                alias = alias_parts[-1].strip()
-                if alias == class_name:
-                    module_text = self._read_module_text(module_path, file_path)
-                    if module_text:
-                        module_text = self._normalize_multiline_defs(module_text)
-                        sig = self._find_method_signature_in_class(module_text, original, method_name)
-                        if sig:
-                            return sig
-                        # Follow re-exports
-                        sub_text = self._follow_reexport(module_text, original, module_path, file_path)
-                        if sub_text:
-                            sub_text = self._normalize_multiline_defs(sub_text)
-                            sig = self._find_method_signature_in_class(sub_text, original, method_name)
-                            if sig:
-                                return sig
+                module_path = _node_text(source, module_node)
+                if module_path.startswith("."):
+                    continue
+                for imp in child.children:
+                    if imp.type == "dotted_name" and imp != module_node:
+                        if _node_text(source, imp) == name:
+                            return module_path, name
+                    elif imp.type == "aliased_import":
+                        alias = imp.child_by_field_name("alias")
+                        orig = imp.child_by_field_name("name")
+                        if alias and _node_text(source, alias) == name:
+                            return module_path, _node_text(source, orig) if orig else name
+                        if not alias and orig and _node_text(source, orig) == name:
+                            return module_path, name
+            # Handle try/except blocks containing imports
+            elif child.type == "try_statement":
+                for body_child in child.children:
+                    block = body_child if body_child.type == "block" else None
+                    if body_child.type == "except_clause":
+                        for sub in body_child.children:
+                            if sub.type == "block":
+                                block = sub
+                    if block:
+                        for stmt in block.children:
+                            if stmt.type == "import_from_statement":
+                                result = PythonCompletionProvider._find_import_in_stmt(source, stmt, name)
+                                if result:
+                                    return result
+        return None
+
+    @staticmethod
+    def _find_import_in_stmt(source, stmt, name):
+        """Check a single import_from_statement for an imported name."""
+        from editor.autocomplete.tree_sitter_provider import _node_text
+
+        module_node = stmt.child_by_field_name("module_name")
+        if not module_node:
+            return None
+        module_path = _node_text(source, module_node)
+        if module_path.startswith("."):
+            return None
+        for imp in stmt.children:
+            if imp.type == "dotted_name" and imp != module_node:
+                if _node_text(source, imp) == name:
+                    return module_path, name
+            elif imp.type == "aliased_import":
+                alias = imp.child_by_field_name("alias")
+                orig = imp.child_by_field_name("name")
+                if alias and _node_text(source, alias) == name:
+                    return module_path, _node_text(source, orig) if orig else name
+                if not alias and orig and _node_text(source, orig) == name:
+                    return module_path, name
         return None
 
     @staticmethod
@@ -540,67 +601,62 @@ class PythonCompletionProvider:
         parts = dot_chain.split(".")
         first = parts[0]
 
-        # Handle self/cls: resolve to enclosing class
-        if first in ("self", "cls") and cursor_offset is not None:
-            class_name = self._find_enclosing_class(buffer_text, cursor_offset)
-            if class_name:
-                if len(parts) == 1:
-                    return self._extract_self_completions(buffer_text, class_name)
-                else:
-                    chain = [class_name] + parts[1:]
-                    return self._resolve_chain_in_text(buffer_text, chain)
+        source, tree = _parse(buffer_text, "python")
+        if tree is None:
             return []
 
-        # Try to resolve variable type from assignment (e.g., var = ClassName(...))
-        resolved_class = self._resolve_variable_type(buffer_text, first)
+        # Handle self/cls: resolve to enclosing class
+        if first in ("self", "cls") and cursor_offset is not None:
+            byte_offset = len(buffer_text[:cursor_offset].encode("utf-8"))
+            class_name = py_find_enclosing_class(source, tree, byte_offset)
+            if class_name:
+                if len(parts) == 1:
+                    return py_extract_self_members(source, tree, class_name)
+                else:
+                    chain = [class_name] + parts[1:]
+                    return py_resolve_chain(source, tree, chain)
+            return []
+
+        # Try to resolve variable type from assignment
+        resolved_class = py_resolve_variable_type(source, tree, first)
         if resolved_class and resolved_class != first:
             resolved_parts = [resolved_class] + parts[1:]
-            local = self._resolve_chain_in_text(buffer_text, resolved_parts)
+            local = py_resolve_chain(source, tree, resolved_parts)
             if local:
                 return local
-            # Update for import resolution fallback
             first = resolved_class
             parts = resolved_parts
 
-        # Check local classes first (walk chain in current buffer)
-        local = self._resolve_chain_in_text(buffer_text, parts)
+        # Check local classes first
+        local = py_resolve_chain(source, tree, parts)
         if local:
             return local
 
-        # Find module path from imports for the first identifier
-        module_path = None
-        original_name = first
-        for m in re.finditer(r"^from\s+([\w.]+)\s+import\s+(.+?)$", buffer_text, re.MULTILINE):
-            for part in m.group(2).strip("()").split(","):
-                part = part.strip()
-                if not part or part.startswith("#"):
-                    continue
-                split_parts = part.split(" as ")
-                alias = split_parts[-1].strip()
-                orig = split_parts[0].strip()
-                if alias == first:
-                    module_path = m.group(1)
-                    original_name = orig
-                    break
-            if module_path:
-                break
-
-        if not module_path:
+        # Find module path from imports
+        module_info = self._find_import_module(source, tree, first)
+        if not module_info:
             return []
 
+        module_path, original_name = module_info
         module_text = self._read_module_text(module_path, file_path)
         if not module_text:
             return []
 
+        m_source, m_tree = _parse(module_text, "python")
+        if m_tree is None:
+            return []
+
         chain = [original_name] + parts[1:]
-        result = self._resolve_chain_in_text(module_text, chain)
+        result = py_resolve_chain(m_source, m_tree, chain)
         if result:
             return result
 
-        # Follow re-exports in __init__.py (e.g., from .sub import ClassName)
-        sub_text = self._follow_reexport(module_text, original_name, module_path, file_path)
+        # Follow re-exports
+        sub_text = self._follow_reexport_ts(m_source, m_tree, original_name, module_path, file_path)
         if sub_text:
-            return self._resolve_chain_in_text(sub_text, chain)
+            s_source, s_tree = _parse(sub_text, "python")
+            if s_tree:
+                return py_resolve_chain(s_source, s_tree, chain)
         return []
 
     def get_module_completions(self, base_module_path, file_path):
@@ -664,200 +720,37 @@ class PythonCompletionProvider:
 
     # --- Private helpers ---
 
-    def _extract_init_signature(self, text, class_name):
-        """Extract __init__ signature from a class, formatted as ClassName(params).
-
-        For dataclasses (decorated with @dataclass), extracts type-annotated
-        fields as constructor parameters since they have no explicit __init__.
-        """
-        body = self._get_class_body_text(text, class_name)
-        if not body:
-            return f"{class_name}()"
-        body = self._normalize_multiline_defs(body)
-        m = re.search(r"def\s+__init__\s*(\([^)]*\))", body)
-        if m:
-            return f"{class_name}{m.group(1)}"
-        # For dataclasses, extract fields as constructor params
-        if self._is_dataclass(text, class_name):
-            fields = self._extract_dataclass_fields(body)
-            if fields:
-                return f"{class_name}({', '.join(fields)})"
-        return f"{class_name}()"
-
-    @staticmethod
-    def _is_dataclass(text, class_name):
-        """Check if a class has a @dataclass decorator."""
-        m = re.search(rf"^class\s+{re.escape(class_name)}\b", text, re.MULTILINE)
-        if not m:
-            return False
-        before = text[: m.start()].rstrip()
-        for line in reversed(before.split("\n")[-5:]):
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            if re.match(r"@(?:dataclasses?\.)?dataclass\b", stripped):
-                return True
-            if stripped.startswith("@"):
-                continue  # other decorator, keep looking
-            break  # non-decorator line, stop
-        return False
-
-    @staticmethod
-    def _extract_dataclass_fields(body):
-        """Extract field names with types from a dataclass body for constructor signature."""
-        fields = []
-        base_indent = None
-        for line in body.split("\n"):
-            if not line.strip():
-                continue
-            indent = len(line) - len(line.lstrip())
-            if base_indent is None:
-                base_indent = indent
-            if indent != base_indent:
-                continue
-            stripped = line.strip()
-            # Match type-annotated field: name: Type [= default]
-            m = re.match(r"([A-Za-z_]\w*)\s*:\s*", stripped)
-            if not m:
-                continue
-            name = m.group(1)
-            rest = stripped[m.end() :]
-            # Determine type hint (before any = default)
-            eq_idx = rest.find(" = ")
-            type_hint = rest[:eq_idx].strip() if eq_idx >= 0 else rest.strip()
-            # Skip ClassVar (not an __init__ parameter)
-            if type_hint.startswith("ClassVar"):
-                continue
-            # Skip field(init=False)
-            if "field(" in rest and "init=False" in rest:
-                continue
-            fields.append(f"{name}: {type_hint}")
-        return fields
-
-    @staticmethod
-    def _extract_docstring_at(text, pos):
-        """Extract first line of docstring or comment for a def/class at text position pos.
-
-        Looks for triple-quoted docstring after the definition first, then
-        falls back to # comment lines immediately above the definition.
-        """
-        rest = text[pos:]
-        m = re.match(r"[ \t]*\n[ \t]*(\"\"\"|\'{3})", rest)
-        if m:
-            quote = m.group(1)
-            after_quote = m.end()
-            end_quote = rest.find(quote, after_quote)
-            if end_quote != -1:
-                doc = rest[after_quote:end_quote].strip()
-                first_line = doc.split("\n")[0].strip()
-                if first_line:
-                    return first_line[:120]
-
-        # Fall back to # comment above the definition
-        before = text[:pos]
-        # Walk back to the start of the def/class line
-        line_start = before.rfind("\n")
-        if line_start == -1:
-            line_start = 0
-        above = text[:line_start].rstrip()
-        for line in reversed(above.split("\n")):
-            stripped = line.strip()
-            if not stripped:
-                continue
-            if stripped.startswith("#"):
-                return stripped.lstrip("# ").strip()[:120]
-            break
-        return ""
-
-    @staticmethod
-    def _peek_docstring(lines, idx):
-        """Extract full docstring or comment from lines around a def at idx.
-
-        Looks for triple-quoted docstrings after the def first, then falls back
-        to # comment lines immediately above the def.
-        """
-        # 1. Look for triple-quoted docstring after def
-        for j in range(idx + 1, min(idx + 4, len(lines))):
-            stripped = lines[j].strip()
-            if not stripped:
-                continue
-            for quote in ('"""', "'''"):
-                if stripped.startswith(quote):
-                    # Single-line: """docstring"""
-                    if stripped.endswith(quote) and len(stripped) > 6:
-                        return stripped[3:-3].strip()
-                    content = stripped[3:].strip()
-                    # Collect all lines until closing quote
-                    doc_lines = []
-                    if content:
-                        if content.endswith(quote):
-                            return content[: -len(quote)].strip()
-                        doc_lines.append(content)
-                    # Read subsequent lines until closing triple quote
-                    for k in range(j + 1, min(j + 30, len(lines))):
-                        line_k = lines[k].strip()
-                        if quote in line_k:
-                            before_close = line_k[: line_k.index(quote)].strip()
-                            if before_close:
-                                doc_lines.append(before_close)
-                            break
-                        if line_k:
-                            doc_lines.append(line_k)
-                    return "\n".join(doc_lines) if doc_lines else ""
-            break
-
-        # 2. Fall back to # comment block above the def line
-        for j in range(idx - 1, max(idx - 6, -1), -1):
-            stripped = lines[j].strip()
-            if not stripped:
-                continue
-            if stripped.startswith("#"):
-                return stripped.lstrip("# ").strip()
-            break
-        return ""
-
-    def _get_imports(self, text):
-        """Extract imported symbol names from Python code."""
-        imports = []
-
-        for m in re.finditer(r"^import\s+([\w.]+)(?:\s+as\s+(\w+))?", text, re.MULTILINE):
-            alias = m.group(2) or m.group(1).split(".")[-1]
-            imports.append(CompletionItem(alias, CompletionKind.VARIABLE))
-
-        for m in re.finditer(r"^from\s+[\w.]+\s+import\s+(.+?)$", text, re.MULTILINE):
-            names_str = m.group(1).strip("()")
-            for name_part in names_str.split(","):
-                name_part = name_part.strip()
-                if not name_part or name_part.startswith("#"):
-                    continue
-                parts = name_part.split(" as ")
-                alias = parts[1].strip() if len(parts) > 1 else parts[0].strip()
-                if alias:
-                    imports.append(CompletionItem(alias, CompletionKind.VARIABLE))
-
-        return imports
-
-    def _enrich_imports(self, imports, buffer_text, file_path):
+    def _enrich_imports(self, imports, source, tree, file_path):
         """Enrich imported symbols with kind, signature, and docstring from source files."""
-        # Build map: module_path → list of imported names
-        module_names = {}
-        for m in re.finditer(r"^from\s+([\w.]+)\s+import\s+(.+?)$", buffer_text, re.MULTILINE):
-            module_path = m.group(1)
-            names_str = m.group(2).strip("()")
-            for name_part in names_str.split(","):
-                name_part = name_part.strip()
-                if not name_part or name_part.startswith("#"):
-                    continue
-                parts = name_part.split(" as ")
-                original = parts[0].strip()
-                alias = parts[1].strip() if len(parts) > 1 else original
-                if alias:
-                    module_names.setdefault(module_path, []).append((original, alias))
+        from editor.autocomplete.tree_sitter_provider import _node_text
 
-        # Resolve each module and enrich matching imports
+        # Build map: module_path → list of (original, alias)
+        module_names: dict[str, list[tuple[str, str]]] = {}
+        root = tree.root_node
+        for child in root.children:
+            if child.type != "import_from_statement":
+                continue
+            module_node = child.child_by_field_name("module_name")
+            if not module_node:
+                continue
+            mod_path = _node_text(source, module_node)
+            if mod_path.startswith("."):
+                continue
+            for imp in child.children:
+                if imp.type == "dotted_name" and imp != module_node:
+                    name = _node_text(source, imp)
+                    module_names.setdefault(mod_path, []).append((name, name))
+                elif imp.type == "aliased_import":
+                    alias_n = imp.child_by_field_name("alias")
+                    orig_n = imp.child_by_field_name("name")
+                    orig = _node_text(source, orig_n) if orig_n else ""
+                    alias = _node_text(source, alias_n) if alias_n else orig
+                    if alias:
+                        module_names.setdefault(mod_path, []).append((orig, alias))
+
         import_by_alias = {item.name: item for item in imports}
-        for module_path, names in module_names.items():
-            rel_path = module_path.replace(".", "/")
+        for mod_path, names in module_names.items():
+            rel_path = mod_path.replace(".", "/")
             py_file = self._find_module_file(rel_path, file_path)
             if not py_file:
                 continue
@@ -871,113 +764,30 @@ class PythonCompletionProvider:
                     item.signature = src.signature
                     item.docstring = src.docstring
 
-    def _get_symbols(self, text):
-        """Extract local symbol definitions from Python code."""
-        symbols = []
-
-        for m in re.finditer(r"^class\s+(\w+)[^:]*:", text, re.MULTILINE):
-            doc = self._extract_docstring_at(text, m.end())
-            init_sig = self._extract_init_signature(text, m.group(1))
-            symbols.append(CompletionItem(m.group(1), CompletionKind.CLASS, signature=init_sig, docstring=doc))
-        for m in re.finditer(r"^\s*def\s+(\w+)\s*(\([^)]*\))\s*(?:->\s*(.+?))?\s*:", text, re.MULTILINE):
-            sig = f"{m.group(1)}{m.group(2)}"
-            if m.group(3):
-                sig += f" → {m.group(3).strip()}"
-            doc = self._extract_docstring_at(text, m.end())
-            symbols.append(CompletionItem(m.group(1), CompletionKind.FUNCTION, sig, doc))
-        for m in re.finditer(r"^(\w+)\s*=", text, re.MULTILINE):
-            name = m.group(1)
-            if name not in ("_", "__all__", "__version__"):
-                symbols.append(CompletionItem(name, CompletionKind.VARIABLE))
-
-        return symbols
-
-    @staticmethod
-    def _normalize_multiline_defs(text):
-        """Join multi-line def statements into single lines for signature extraction."""
-        lines = text.splitlines()
-        result = []
-        accumulator = None
-        paren_depth = 0
-        for line in lines:
-            if accumulator is not None:
-                accumulator += " " + line.strip()
-                paren_depth += line.count("(") - line.count(")")
-                if paren_depth <= 0:
-                    result.append(accumulator)
-                    accumulator = None
-                    paren_depth = 0
-            elif re.match(r"\s*def\s+\w+\s*\(", line):
-                paren_depth = line.count("(") - line.count(")")
-                if paren_depth <= 0:
-                    result.append(line)
-                    paren_depth = 0
-                else:
-                    accumulator = line
-            else:
-                result.append(line)
-        if accumulator:
-            result.append(accumulator)
-        return "\n".join(result)
-
     def _parse_symbols(self, py_file):
-        """Parse a Python file and extract top-level symbol names.
+        """Parse a Python file and extract top-level symbol names using tree-sitter.
 
-        For __init__.py files, also follows relative re-exports
-        (e.g. 'from .submodule import Name') to resolve symbols from sibling files.
+        For __init__.py files, also follows relative re-exports.
         """
-        symbols = {}
         try:
             text = py_file.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             return []
 
-        text = self._normalize_multiline_defs(text)
-        lines = text.splitlines()
+        m_source, m_tree = _parse(text, "python")
+        if m_tree is None:
+            return []
 
-        # Collect relative re-exports to resolve later (only for __init__.py)
-        reexports = {}  # name → relative_module (e.g. "db_item_handler")
-        is_init = py_file.name == "__init__.py"
-
-        for i, line in enumerate(lines):
-            m = re.match(r"^class\s+(\w+)", line)
-            if m:
-                doc = self._peek_docstring(lines, i)
-                init_sig = self._extract_init_signature(text, m.group(1))
-                symbols[m.group(1)] = (init_sig, CompletionKind.CLASS, doc)
-                continue
-            m = re.match(r"^def\s+(\w+)\s*(\([^)]*\))\s*(?:->\s*(.+?))?\s*:", line)
-            if m:
-                sig = f"{m.group(1)}{m.group(2)}"
-                if m.group(3):
-                    sig += f" → {m.group(3).strip()}"
-                doc = self._peek_docstring(lines, i)
-                symbols[m.group(1)] = (sig, CompletionKind.FUNCTION, doc)
-                continue
-            m = re.match(r"^def\s+(\w+)", line)
-            if m:
-                symbols[m.group(1)] = ("", CompletionKind.FUNCTION, "")
-                continue
-            m = re.match(r"^([A-Za-z_]\w*)\s*=", line)
-            if m and not m.group(1).startswith("_"):
-                symbols[m.group(1)] = ("", CompletionKind.PROPERTY, "")
-                continue
-            # Track relative re-exports in __init__.py
-            if is_init:
-                m = re.match(r"^from\s+\.(\w+)\s+import\s+(.+?)$", line)
-                if m:
-                    rel_module = m.group(1)
-                    for name_part in m.group(2).split(","):
-                        name_part = name_part.strip()
-                        if name_part and not name_part.startswith("#"):
-                            original = name_part.split(" as ")[0].strip()
-                            if original and original not in symbols:
-                                reexports[original] = rel_module
+        result = py_extract_file_symbols(m_source, m_tree)
+        if isinstance(result, tuple):
+            symbols, reexports = result
+        else:
+            return result
 
         # Resolve re-exported symbols from sibling files
         if reexports:
             pkg_dir = py_file.parent
-            resolved_modules = {}  # cache: rel_module → symbols dict
+            resolved_modules: dict[str, dict] = {}
             for name, rel_module in reexports.items():
                 if name in symbols:
                     continue
@@ -985,182 +795,43 @@ class PythonCompletionProvider:
                     sibling = pkg_dir / f"{rel_module}.py"
                     if sibling.is_file():
                         resolved_modules[rel_module] = {
-                            item.name: (item.signature, item.kind, item.docstring) for item in self._parse_symbols(sibling)
+                            item.name: item for item in self._parse_symbols(sibling)
                         }
                     else:
                         resolved_modules[rel_module] = {}
                 if name in resolved_modules.get(rel_module, {}):
                     symbols[name] = resolved_modules[rel_module][name]
 
-        return sorted(
-            [CompletionItem(name, kind, sig, doc) for name, (sig, kind, doc) in symbols.items()],
-            key=lambda x: x.name,
-        )
+        return sorted(symbols.values(), key=lambda x: x.name)
 
-    def _find_enclosing_class(self, buffer_text, cursor_offset):
-        """Find the class name that encloses the given cursor offset."""
-        text_before = buffer_text[:cursor_offset]
-        lines = text_before.split("\n")
-        if not lines:
-            return None
-        current_line = lines[-1]
-        if current_line.strip():
-            current_indent = len(current_line) - len(current_line.lstrip())
-        else:
-            current_indent = float("inf")
+    def _follow_reexport_ts(self, source, tree, class_name, module_path, file_path):
+        """Follow re-exports in __init__.py using tree-sitter."""
+        from editor.autocomplete.tree_sitter_provider import _node_text
 
-        for i in range(len(lines) - 1, -1, -1):
-            line = lines[i]
-            stripped = line.lstrip()
-            if re.match(r"class\s+\w+", stripped):
-                class_indent = len(line) - len(stripped)
-                if class_indent < current_indent:
-                    m = re.match(r"class\s+(\w+)", stripped)
-                    if m:
-                        return m.group(1)
+        root = tree.root_node
+        for child in root.children:
+            if child.type != "import_from_statement":
+                continue
+            module_node = child.child_by_field_name("module_name")
+            if not module_node:
+                continue
+            mod_text = _node_text(source, module_node)
+            if not mod_text.startswith(".") or mod_text.startswith(".."):
+                continue
+            # Check if class_name is among the imported names
+            for imp in child.children:
+                name = None
+                if imp.type == "dotted_name" and imp != module_node:
+                    name = _node_text(source, imp)
+                elif imp.type == "aliased_import":
+                    orig = imp.child_by_field_name("name")
+                    if orig:
+                        name = _node_text(source, orig)
+                if name == class_name:
+                    rel_module = mod_text.lstrip(".")
+                    sub_path = f"{module_path}.{rel_module}"
+                    return self._read_module_text(sub_path, file_path)
         return None
-
-    def _extract_self_completions(self, text, class_name):
-        """Extract all members accessible via self. for a class."""
-        members = {}
-        text = self._normalize_multiline_defs(text)
-        class_match = re.search(rf"^class\s+{re.escape(class_name)}\b[^:]*:", text, re.MULTILINE)
-        if not class_match:
-            return []
-        lines = text[class_match.end() :].split("\n")
-        base_indent = None
-        for i, line in enumerate(lines):
-            if not line.strip():
-                continue
-            indent = len(line) - len(line.lstrip())
-            if base_indent is None:
-                base_indent = indent
-                if indent == 0:
-                    break
-            if indent < base_indent:
-                break
-            stripped = line.strip()
-            # Methods (include private, skip dunder)
-            m = re.match(r"def\s+(\w+)\s*(\([^)]*\))\s*(?:->\s*(.+?))?\s*:", stripped)
-            if m:
-                name = m.group(1)
-                if not (name.startswith("__") and name.endswith("__")):
-                    sig = f"{name}{m.group(2)}"
-                    if m.group(3):
-                        sig += f" → {m.group(3).strip()}"
-                    doc = self._peek_docstring(lines, i)
-                    members[name] = (sig, CompletionKind.FUNCTION, doc)
-                continue
-            m = re.match(r"def\s+(\w+)", stripped)
-            if m:
-                name = m.group(1)
-                if not (name.startswith("__") and name.endswith("__")):
-                    members[name] = ("", CompletionKind.FUNCTION, "")
-                continue
-            # Class-level attributes
-            if indent == base_indent:
-                m = re.match(r"class\s+(\w+)", stripped)
-                if m:
-                    members[m.group(1)] = ("", CompletionKind.CLASS, "")
-                    continue
-                m = re.match(r"([A-Za-z_]\w*)\s*[:=]", stripped)
-                if m:
-                    members[m.group(1)] = ("", CompletionKind.PROPERTY, "")
-                    continue
-            # Instance attributes (self.xxx = ...)
-            m = re.match(r"self\.(\w+)\s*=", stripped)
-            if m:
-                name = m.group(1)
-                if name not in members:
-                    members[name] = ("", CompletionKind.PROPERTY, "")
-        return sorted(
-            [CompletionItem(name, kind, sig, doc) for name, (sig, kind, doc) in members.items()],
-            key=lambda x: x.name,
-        )
-
-    def _resolve_variable_type(self, text, var_name):
-        """Resolve the class name from a variable's assignment or type annotation.
-
-        Handles patterns like:
-        - var = ClassName(...)
-        - var = module.ClassName(...)
-        - var: ClassName = ...
-        """
-        # var = ClassName(...) or var = module.ClassName(...)
-        m = re.search(rf"^\s*{re.escape(var_name)}\s*=\s*([\w.]+)\(", text, re.MULTILINE)
-        if m:
-            return m.group(1).split(".")[-1]
-        # var: ClassName = ...
-        m = re.search(rf"^\s*{re.escape(var_name)}\s*:\s*([\w.]+)\s*=", text, re.MULTILINE)
-        if m:
-            return m.group(1).split(".")[-1]
-        return None
-
-    def _resolve_chain_in_text(self, text, parts):
-        """Walk a chain of class names in text and return members of the final class."""
-        current_text = text
-        for i, part in enumerate(parts):
-            if i == len(parts) - 1:
-                # Try nested class first
-                members = self._extract_class_members(current_text, part)
-                if members:
-                    return members
-                # If part is an attribute (enum member, class var) inside a class body,
-                # return methods from that class body. Only applies when we've drilled
-                # into a class (i > 0), not at top-level buffer scope.
-                if i > 0 and re.search(rf"^\s*{re.escape(part)}\s*=", current_text, re.MULTILINE):
-                    return self._extract_methods_from_body(current_text)
-                return []
-            body = self._get_class_body_text(current_text, part)
-            if not body:
-                return []
-            current_text = body
-        return []
-
-    def _extract_methods_from_body(self, body_text):
-        """Extract public methods from a class body (for attribute/enum member completions)."""
-        members = {}
-        body_text = self._normalize_multiline_defs(body_text)
-        lines = body_text.splitlines()
-        for i, line in enumerate(lines):
-            stripped = line.strip()
-            m = re.match(r"def\s+(\w+)\s*(\([^)]*\))\s*(?:->\s*(.+?))?\s*:", stripped)
-            if m and not m.group(1).startswith("_"):
-                sig = f"{m.group(1)}{m.group(2)}"
-                if m.group(3):
-                    sig += f" → {m.group(3).strip()}"
-                doc = self._peek_docstring(lines, i)
-                members[m.group(1)] = (sig, CompletionKind.FUNCTION, doc)
-                continue
-            m = re.match(r"def\s+(\w+)", stripped)
-            if m and not m.group(1).startswith("_"):
-                members[m.group(1)] = ("", CompletionKind.FUNCTION, "")
-        return sorted(
-            [CompletionItem(name, kind, sig, doc) for name, (sig, kind, doc) in members.items()],
-            key=lambda x: x.name,
-        )
-
-    def _get_class_body_text(self, text, class_name):
-        """Extract the body of a class as text, including nested definitions."""
-        class_match = re.search(rf"^class\s+{re.escape(class_name)}\b[^:]*:", text, re.MULTILINE)
-        if not class_match:
-            return None
-        lines = text[class_match.end() :].split("\n")
-        body_lines = []
-        base_indent = None
-        for line in lines:
-            if not line.strip():
-                body_lines.append(line)
-                continue
-            indent = len(line) - len(line.lstrip())
-            if base_indent is None:
-                base_indent = indent
-                if indent == 0:
-                    break
-            if indent < base_indent:
-                break
-            body_lines.append(line)
-        return "\n".join(body_lines)
 
     def _find_venv_site_packages(self, file_path):
         """Find virtualenv site-packages directories for the project."""
@@ -1214,57 +885,3 @@ class PythonCompletionProvider:
             except OSError:
                 return None
         return None
-
-    def _follow_reexport(self, module_text, class_name, module_path, file_path):
-        """Follow re-exports in __init__.py (e.g., from .sub import ClassName)."""
-        pattern = rf"^from\s+\.(\w+)\s+import\s+.*\b{re.escape(class_name)}\b"
-        m = re.search(pattern, module_text, re.MULTILINE)
-        if not m:
-            return None
-        sub_path = f"{module_path}.{m.group(1)}"
-        return self._read_module_text(sub_path, file_path)
-
-    def _extract_class_members(self, text, class_name):
-        """Extract public methods and class-level attributes from a class."""
-        members = {}
-        text = self._normalize_multiline_defs(text)
-        class_match = re.search(rf"^class\s+{re.escape(class_name)}\b[^:]*:", text, re.MULTILINE)
-        if not class_match:
-            return []
-        lines = text[class_match.end() :].split("\n")
-        base_indent = None
-        for i, line in enumerate(lines):
-            if not line.strip():
-                continue
-            indent = len(line) - len(line.lstrip())
-            if base_indent is None:
-                base_indent = indent
-                if indent == 0:
-                    break
-            if indent < base_indent:
-                break
-            stripped = line.strip()
-            m = re.match(r"def\s+(\w+)\s*(\([^)]*\))\s*(?:->\s*(.+?))?\s*:", stripped)
-            if m and not m.group(1).startswith("_"):
-                sig = f"{m.group(1)}{m.group(2)}"
-                if m.group(3):
-                    sig += f" → {m.group(3).strip()}"
-                doc = self._peek_docstring(lines, i)
-                members[m.group(1)] = (sig, CompletionKind.FUNCTION, doc)
-                continue
-            m = re.match(r"def\s+(\w+)", stripped)
-            if m and not m.group(1).startswith("_"):
-                members[m.group(1)] = ("", CompletionKind.FUNCTION, "")
-                continue
-            if indent == base_indent:
-                m = re.match(r"class\s+(\w+)", stripped)
-                if m:
-                    members[m.group(1)] = ("", CompletionKind.CLASS, "")
-                    continue
-                m = re.match(r"([A-Za-z]\w*)\s*=", stripped)
-                if m:
-                    members[m.group(1)] = ("", CompletionKind.PROPERTY, "")
-        return sorted(
-            [CompletionItem(name, kind, sig, doc) for name, (sig, kind, doc) in members.items()],
-            key=lambda x: x.name,
-        )

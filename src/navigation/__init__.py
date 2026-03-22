@@ -1,12 +1,11 @@
 """
 Navigation provider system for Zen IDE.
 
-Supports pluggable backends: custom (regex) and terraform.
-Language-specific code navigation: Python, Terraform.
+Supports pluggable backends: Tree-sitter (Python, TS/JS) and Terraform.
+Language-specific code navigation: Python, TypeScript/JavaScript, Terraform.
 """
 
-from navigation.custom_provider import CustomProvider
 from navigation.navigation_provider import NavigationProvider
-from navigation.terraform_provider import TerraformProvider
+from navigation.tree_sitter_tf_provider import TreeSitterTfProvider
 
-__all__ = ["NavigationProvider", "CustomProvider", "TerraformProvider"]
+__all__ = ["NavigationProvider", "TreeSitterTfProvider"]

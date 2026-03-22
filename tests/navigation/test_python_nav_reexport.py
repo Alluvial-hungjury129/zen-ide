@@ -53,18 +53,18 @@ class TestFindVariableClass:
     def test_finds_constructor_assignment(self):
         stub = StubMixin()
         content = "handler = DBItemHandler(table, parse_decimal=False)\n"
-        assert stub._find_variable_class(content, "handler") == "DBItemHandler"
+        assert stub._ts_py.find_variable_class(content, "handler") == "DBItemHandler"
 
     def test_returns_none_for_unknown_var(self):
         stub = StubMixin()
         content = "x = 42\n"
-        assert stub._find_variable_class(content, "handler") is None
+        assert stub._ts_py.find_variable_class(content, "handler") is None
 
     def test_finds_self_assignment(self):
         stub = StubMixin()
         content = "        self.client = HttpClient(base_url)\n"
-        # _find_variable_class matches self.client = HttpClient(...)
-        assert stub._find_variable_class(content, "self.client") == "HttpClient"
+        # self.attr assignments are handled by _find_self_attr_class
+        assert stub._ts_py.find_self_attr_class(content, "client") == "HttpClient"
 
 
 class TestCase2bReexportNavigation:
@@ -128,11 +128,11 @@ class TestSelfAttrMethodNavigation:
             "    def run(self):\n"
             "        self.utils.do_work()\n"
         )
-        class_name = stub._find_self_attr_class(content, "utils")
+        class_name = stub._ts_py.find_self_attr_class(content, "utils")
         assert class_name == "MyUtils"
 
         # Step 2: class is in imports
-        imports = stub._parse_python_imports(content)
+        imports = stub._ts_py.parse_imports(content)
         assert "MyUtils" in imports
         assert imports["MyUtils"] == "mypkg.MyUtils"
 
@@ -161,17 +161,17 @@ class TestSelfAttrMethodNavigation:
             "    def __init__(self):\n"
             "        self.client = HttpClient(base_url)\n"
         )
-        class_name = stub._find_self_attr_class(content, "client")
+        class_name = stub._ts_py.find_self_attr_class(content, "client")
         assert class_name == "HttpClient"
 
-        imports = stub._parse_python_imports(content)
+        imports = stub._ts_py.parse_imports(content)
         assert imports["HttpClient"] == "http_client.HttpClient"
 
     def test_self_attr_not_class_instantiation(self):
         """self.data = get_data() — lowercase RHS should not resolve."""
         stub = StubMixin()
         content = "class Proc:\n    def __init__(self):\n        self.data = get_data()\n"
-        assert stub._find_self_attr_class(content, "data") is None
+        assert stub._ts_py.find_self_attr_class(content, "data") is None
 
     def test_self_attr_with_multiple_attrs(self):
         """Multiple self.attr assignments — each should resolve independently."""
@@ -183,9 +183,9 @@ class TestSelfAttrMethodNavigation:
             "        self.cache = CacheClient(redis_url)\n"
             "        self.logger = Logger(name)\n"
         )
-        assert stub._find_self_attr_class(content, "repo") == "Repository"
-        assert stub._find_self_attr_class(content, "cache") == "CacheClient"
-        assert stub._find_self_attr_class(content, "logger") == "Logger"
+        assert stub._ts_py.find_self_attr_class(content, "repo") == "Repository"
+        assert stub._ts_py.find_self_attr_class(content, "cache") == "CacheClient"
+        assert stub._ts_py.find_self_attr_class(content, "logger") == "Logger"
 
 
 class TestAbsoluteImportReexport:

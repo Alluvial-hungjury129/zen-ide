@@ -779,6 +779,11 @@ class EditorTab:
         # Semantic call-site highlighting (class usage + function calls)
         setup_semantic_highlight(self, get_theme())
 
+        # Tree-sitter parse tree cache (incremental updates for semantic features)
+        from .tree_sitter_buffer import setup_buffer_cache
+
+        setup_buffer_cache(self)
+
         # Autocomplete (Ctrl+Space)
         from .autocomplete import Autocomplete
 

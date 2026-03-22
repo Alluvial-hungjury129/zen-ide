@@ -11,7 +11,7 @@ class TerraformNavigationMixin:
 
     def _handle_terraform_click(self, buffer, view, file_path, click_iter) -> bool:
         """Handle Cmd+Click for Terraform (.tf) files."""
-        from navigation.terraform_provider import TerraformProvider
+        from navigation.tree_sitter_tf_provider import TreeSitterTfProvider
 
         word = self._get_word_at_iter(buffer, click_iter)
         if not word:
@@ -21,7 +21,7 @@ class TerraformNavigationMixin:
         if not chain:
             return False
 
-        provider = TerraformProvider()
+        provider = TreeSitterTfProvider()
         result = provider.resolve_reference(chain, file_path)
         if result:
             target_file, target_line = result

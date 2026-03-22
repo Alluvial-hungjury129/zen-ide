@@ -1,7 +1,7 @@
 # Navigation System
 
 **Created_at:** 2026-01-22  
-**Updated_at:** 2026-03-16  
+**Updated_at:** 2026-03-22  
 **Status:** Active  
 **Goal:** Document code navigation (Cmd+Click / Go-to-Definition) and symbol resolution  
 **Scope:** `src/navigation/code_navigation.py`, `src/navigation/code_navigation_py.py`, module resolution  
@@ -121,7 +121,7 @@ from .log_gateway import LogGateway
 
 ### 4. Symbol Finding: `_find_symbol_in_editor()`
 
-Uses regex patterns to locate symbol definitions in code:
+Uses **Tree-sitter AST queries** (with regex fallback) to locate symbol definitions in code. See [Tree-sitter Navigation](2026_03_22_tree_sitter_navigation.md) for details on the AST-based implementation.
 
 | Pattern | Matches |
 |---------|---------|
@@ -273,4 +273,4 @@ Run: `make tests` to verify this behavior is preserved.
 
 ## Future Improvements
 
-The navigation code has been extracted from the former `language_service.py` into dedicated files under `src/navigation/`. Further improvements could include LSP integration for more accurate cross-language navigation.
+The navigation code has been extracted from the former `language_service.py` into dedicated files under `src/navigation/`. Symbol finding and import parsing now use **Tree-sitter AST queries** (see [Tree-sitter Navigation](2026_03_22_tree_sitter_navigation.md)), with the original regex as a transparent fallback. Further improvements could include LSP integration for cross-language navigation and project-wide symbol indexing.

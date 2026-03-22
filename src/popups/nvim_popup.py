@@ -1067,6 +1067,12 @@ class NvimPopup(Gtk.Window):
         """Show the popup (alias for present, popover-compatible API)."""
         self.present()
 
+    def get_visible(self):
+        """Return True if the popup is currently visible (accounts for Linux Popover path)."""
+        if self._linux_popover:
+            return self._linux_popover.get_visible()
+        return super().get_visible()
+
     def popdown(self):
         """Hide the popup without destroying it."""
         if self._linux_popover:
