@@ -13,11 +13,13 @@ import os
 import pathlib
 import re
 import shutil
+import sys
 import time
 from typing import Optional
 
 from gi.repository import GLib, Gtk, Vte
 
+from constants import AI_TERMINAL_SCROLLBAR_HIDE_DELAY_MS
 from shared.settings import get_setting
 from terminal.terminal_view import TerminalView
 
@@ -152,6 +154,8 @@ class AITerminalView(TerminalView):
         self._session_id: str | None = None  # Claude CLI session ID for resume
         self._resume_attempted = False  # True while a --resume spawn is settling
         self._resume_spawn_time: float = 0.0
+        self._vscroll_overlay_mode = sys.platform == "darwin"
+        self._vscroll_hide_id: int = 0
         self.on_title_inferred = None  # callback(title: str)
         self.on_processing_changed = None  # callback(processing: bool)
         self._get_workspace_folders = get_workspace_folders_callback
@@ -210,6 +214,9 @@ class AITerminalView(TerminalView):
             adjustment=self._vscroll_adj,
         )
         self._vscrollbar.add_css_class("ai-terminal-scrollbar")
+        if self._vscroll_overlay_mode:
+            self._vscrollbar.add_css_class("ai-terminal-scrollbar-overlay")
+            self._vscrollbar.set_visible(False)
         self._vscroll_adj.connect("value-changed", self._on_vscroll_changed)
 
         hbox.append(scrolled)
@@ -531,6 +538,7 @@ class AITerminalView(TerminalView):
         self._in_escape_seq = False
         self._in_osc_seq = False
         self._stop_idle_poll()
+        self._hide_virtual_scrollbar_immediately()
         self._input_buf.clear()
         if callable(self.on_processing_changed):
             self.on_processing_changed(False)
@@ -811,6 +819,36 @@ class AITerminalView(TerminalView):
     # escape sequences so the CLI scrolls its internal content.
     # ------------------------------------------------------------------
 
+    def _show_virtual_scrollbar_temporarily(self) -> None:
+        """Reveal the macOS overlay scrollbar briefly after user interaction."""
+        if not self._vscroll_overlay_mode:
+            return
+        self._cancel_virtual_scrollbar_hide()
+        self._vscrollbar.set_visible(True)
+        self._vscroll_hide_id = GLib.timeout_add(
+            AI_TERMINAL_SCROLLBAR_HIDE_DELAY_MS,
+            self._hide_virtual_scrollbar,
+        )
+
+    def _cancel_virtual_scrollbar_hide(self) -> None:
+        """Cancel a pending overlay scrollbar hide callback."""
+        if self._vscroll_hide_id:
+            GLib.source_remove(self._vscroll_hide_id)
+            self._vscroll_hide_id = 0
+
+    def _hide_virtual_scrollbar(self) -> bool:
+        """Hide the macOS overlay scrollbar after the reveal timeout."""
+        self._vscroll_hide_id = 0
+        if self._vscroll_overlay_mode:
+            self._vscrollbar.set_visible(False)
+        return False
+
+    def _hide_virtual_scrollbar_immediately(self) -> None:
+        """Hide the macOS overlay scrollbar without waiting for the timeout."""
+        self._cancel_virtual_scrollbar_hide()
+        if self._vscroll_overlay_mode:
+            self._vscrollbar.set_visible(False)
+
     def _setup_scroll_controller(self) -> None:
         """AI terminal: observe wheel events to keep the virtual scrollbar in sync.
 
@@ -843,6 +881,8 @@ class AITerminalView(TerminalView):
         if dy == 0.0:
             return False
 
+        self._show_virtual_scrollbar_temporarily()
+
         get_unit = getattr(controller, "get_unit", None)
         scroll_unit = getattr(self._wheel_gdk, "ScrollUnit", None)
         if callable(get_unit) and scroll_unit is not None and get_unit() == scroll_unit.WHEEL:
@@ -862,6 +902,7 @@ class AITerminalView(TerminalView):
         """Translate virtual scrollbar drags into CLI scroll events."""
         if self._vscroll_inhibit:
             return
+        self._show_virtual_scrollbar_temporarily()
         new_val = float(adj.get_value())
         delta = new_val - self._vscroll_prev
         self._vscroll_prev = new_val
@@ -898,6 +939,7 @@ class AITerminalView(TerminalView):
         adj.set_value(_VSCROLL_BOTTOM)
         self._vscroll_prev = float(_VSCROLL_BOTTOM)
         self._vscroll_inhibit = False
+        self._hide_virtual_scrollbar_immediately()
 
     def _on_contents_changed(self, _terminal) -> None:
         """Track CLI output for idle detection."""

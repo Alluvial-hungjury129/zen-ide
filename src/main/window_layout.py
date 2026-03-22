@@ -380,6 +380,13 @@ class WindowLayoutMixin:
             scrollbar slider:hover {{
                 background-color: alpha({theme.fg_color}, 0.4);
             }}
+            .ai-terminal-scrollbar,
+            .ai-terminal-scrollbar trough {{
+                background-color: transparent;
+                background-image: none;
+                border: none;
+                box-shadow: none;
+            }}
             /* ── Global button theming ── */
             /* Flat button hover/active/focus */
             button.flat:hover {{
