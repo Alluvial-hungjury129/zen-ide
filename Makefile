@@ -49,6 +49,8 @@ lint-check: ## Run ruff linter and formatter (check only, no changes)
 test: ## Run tests with pytest
 	uv run --no-sync python -m pytest tests/ --color=yes
 
+tests: test ## Alias for test
+
 # ── Installation ─────────────────────────────────────────────────────
 
 install-py: ## Create venv and install all dependencies

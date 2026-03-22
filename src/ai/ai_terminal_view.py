@@ -180,10 +180,11 @@ class AITerminalView(TerminalView):
         self._ai_header = hdr
         self.append(hdr.box)
 
-        # Layout: HBox with ScrolledWindow (no native scrollbar) + virtual scrollbar
-        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        hbox.set_vexpand(True)
-        hbox.set_hexpand(True)
+        # Layout: overlay the virtual scrollbar on top of the terminal so
+        # revealing it never shifts the content area.
+        overlay = Gtk.Overlay()
+        overlay.set_vexpand(True)
+        overlay.set_hexpand(True)
 
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
@@ -214,14 +215,16 @@ class AITerminalView(TerminalView):
             adjustment=self._vscroll_adj,
         )
         self._vscrollbar.add_css_class("ai-terminal-scrollbar")
+        self._vscrollbar.set_halign(Gtk.Align.END)
+        self._vscrollbar.set_valign(Gtk.Align.FILL)
         if self._vscroll_overlay_mode:
             self._vscrollbar.add_css_class("ai-terminal-scrollbar-overlay")
             self._vscrollbar.set_visible(False)
         self._vscroll_adj.connect("value-changed", self._on_vscroll_changed)
 
-        hbox.append(scrolled)
-        hbox.append(self._vscrollbar)
-        self.append(hbox)
+        overlay.set_child(scrolled)
+        overlay.add_overlay(self._vscrollbar)
+        self.append(overlay)
 
         self._commit_handler_id = self.terminal.connect("commit", self._on_vte_commit)
         self.terminal.connect("contents-changed", self._on_contents_changed)
