@@ -30,8 +30,6 @@ ANSI_BLOWS = Theme(
     tree_modified_fg="#ffff44",
     tree_ignored_fg="#555555",
     # Terminal
-    term_bg="#000000",
-    term_fg="#aaaaaa",
     # Accent
     accent_color="#5050ff",
     # Borders
@@ -39,7 +37,6 @@ ANSI_BLOWS = Theme(
     border_focus="#5050ff",
     sash_color="#333333",
     # Terminal extras
-    term_cyan="#00aaaa",
     # Syntax - mapped from vim highlight groups
     syntax_keyword="#ffff44",  # Statement
     syntax_string="#ff44ff",  # Constant (boldMagenta)
@@ -70,6 +67,7 @@ ANSI_BLOWS = Theme(
     term_yellow="#ffff44",
     term_blue="#1d28d2",
     term_magenta="#aa00aa",
+    term_cyan="#00aaaa",
     term_white="#aaaaaa",
     syntax_parameter="#ff44ff",
     is_dark=True,

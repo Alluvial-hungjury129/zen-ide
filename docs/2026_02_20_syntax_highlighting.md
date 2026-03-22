@@ -117,7 +117,7 @@ The same XML also styles non-syntax editor elements:
 
 ## Layer 3: Semantic Highlighting
 
-**File:** `src/editor/semantic_highlight.py`
+**File:** `src/editor/semantic_highlight.py`, `src/editor/tree_sitter_semantic.py`
 
 GtkSourceView's regex tokenizer only highlights identifiers at **definition sites** (e.g. `class Foo:`, `def bar(`). It cannot color the same names at **usage sites** (e.g. `Foo()`, `bar()`). Zen adds a semantic highlight layer using GTK text tags applied on top of the GtkSourceView output.
 
@@ -125,17 +125,18 @@ GtkSourceView's regex tokenizer only highlights identifiers at **definition site
 
 - **PascalCase identifiers** → colored with `theme.syntax_class` (e.g. `MyClass()`, `ServiceProcessor`)
 - **Function/method calls** → colored with `theme.syntax_function` (e.g. `.process()`, `len()`)
-- Python keywords are excluded to avoid false positives.
-- Tokens inside strings/comments are skipped using GtkSourceView's context classes.
+- **Parameters** → colored distinctly at definition and usage sites
+- **self/cls/this** keywords highlighted
+- Tokens inside strings/comments are naturally skipped because they are distinct AST node types.
 
 ### How It Works
 
-1. `setup_semantic_highlight(tab, theme)` creates two text tags: `zen-class-usage` and `zen-func-call`.
+1. `setup_semantic_highlight(tab, theme)` creates text tags for class usage, function calls, parameters, and self keywords.
 2. On every buffer change, a debounced idle callback runs `_apply_semantic_tags()`.
-3. The function scans the full buffer text with regex patterns, skips keywords and string/comment contexts, and applies the appropriate tag at each match offset.
+3. The function uses **Tree-sitter AST queries** (`tree_sitter_semantic.py`) to walk the syntax tree and classify tokens by their AST node type, then applies the appropriate tag at each match offset.
 4. When the theme changes, `update_semantic_colors()` updates the tag foreground colors.
 
-> **Note:** Semantic highlighting currently only applies to Python files (`python3` / `python` language IDs).
+> **Supported languages:** Python, JavaScript, TypeScript, JSX, TSX.
 
 ## Theme Integration
 

@@ -485,71 +485,92 @@ class TestPythonDocstringExtraction:
     """Test docstring extraction from Python code."""
 
     def setup_method(self):
-        from editor.autocomplete.python_provider import PythonCompletionProvider
+        from editor.autocomplete.tree_sitter_provider import (
+            _parse,
+            py_extract_definitions,
+            py_extract_class_members,
+            py_extract_self_members,
+        )
 
-        self.provider = PythonCompletionProvider()
+        self._parse = _parse
+        self._defs = py_extract_definitions
+        self._members = py_extract_class_members
+        self._self_members = py_extract_self_members
+
+    def _py(self, text):
+        source, tree = self._parse(text, "python")
+        assert tree is not None
+        return source, tree
 
     def test_get_symbols_extracts_function_docstring(self):
         text = 'def greet(name: str):\n    """Say hello to someone."""\n    pass\n'
-        symbols = self.provider._get_symbols(text)
+        source, tree = self._py(text)
+        symbols = self._defs(source, tree)
         func = next(s for s in symbols if s.name == "greet")
         assert func.docstring == "Say hello to someone."
 
     def test_get_symbols_extracts_class_docstring(self):
         text = 'class MyService:\n    """Handles business logic."""\n    pass\n'
-        symbols = self.provider._get_symbols(text)
+        source, tree = self._py(text)
+        symbols = self._defs(source, tree)
         cls = next(s for s in symbols if s.name == "MyService")
         assert cls.docstring == "Handles business logic."
 
     def test_get_symbols_no_docstring(self):
         text = "def process(x):\n    return x + 1\n"
-        symbols = self.provider._get_symbols(text)
+        source, tree = self._py(text)
+        symbols = self._defs(source, tree)
         func = next(s for s in symbols if s.name == "process")
         assert func.docstring == ""
 
     def test_multiline_docstring_takes_first_line(self):
         text = 'def foo():\n    """First line.\n\n    More details here.\n    """\n    pass\n'
-        symbols = self.provider._get_symbols(text)
+        source, tree = self._py(text)
+        symbols = self._defs(source, tree)
         func = next(s for s in symbols if s.name == "foo")
         assert func.docstring == "First line."
 
     def test_single_quote_docstring(self):
         text = "def bar():\n    '''Single-quoted docstring.'''\n    pass\n"
-        symbols = self.provider._get_symbols(text)
+        source, tree = self._py(text)
+        symbols = self._defs(source, tree)
         func = next(s for s in symbols if s.name == "bar")
         assert func.docstring == "Single-quoted docstring."
 
     def test_extract_docstring_at_position(self):
-        from editor.autocomplete.python_provider import PythonCompletionProvider
-
         text = 'def hello():\n    """Greets the user."""\n    pass'
-        pos = text.index(":")  # position of colon after def
-        doc = PythonCompletionProvider._extract_docstring_at(text, pos + 1)
-        assert doc == "Greets the user."
+        source, tree = self._py(text)
+        symbols = self._defs(source, tree)
+        func = next(s for s in symbols if s.name == "hello")
+        assert func.docstring == "Greets the user."
 
     def test_peek_docstring_single_line(self):
-        from editor.autocomplete.python_provider import PythonCompletionProvider
-
-        lines = ["def foo():", '    """A short docstring."""', "    pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 0) == "A short docstring."
+        text = 'def foo():\n    """A short docstring."""\n    pass'
+        source, tree = self._py(text)
+        symbols = self._defs(source, tree)
+        func = next(s for s in symbols if s.name == "foo")
+        assert func.docstring == "A short docstring."
 
     def test_peek_docstring_multiline(self):
-        from editor.autocomplete.python_provider import PythonCompletionProvider
-
-        lines = ["def foo():", '    """', "    The actual description.", '    """', "    pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 0) == "The actual description."
+        text = 'def foo():\n    """\n    The actual description.\n    """\n    pass'
+        source, tree = self._py(text)
+        symbols = self._defs(source, tree)
+        func = next(s for s in symbols if s.name == "foo")
+        assert func.docstring == "The actual description."
 
     def test_peek_docstring_content_after_opening_quote(self):
-        from editor.autocomplete.python_provider import PythonCompletionProvider
-
-        lines = ["def foo():", '    """Description starts here.', '    """', "    pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 0) == "Description starts here."
+        text = 'def foo():\n    """Description starts here.\n    """\n    pass'
+        source, tree = self._py(text)
+        symbols = self._defs(source, tree)
+        func = next(s for s in symbols if s.name == "foo")
+        assert func.docstring == "Description starts here."
 
     def test_peek_docstring_no_docstring(self):
-        from editor.autocomplete.python_provider import PythonCompletionProvider
-
-        lines = ["def foo():", "    return 42"]
-        assert PythonCompletionProvider._peek_docstring(lines, 0) == ""
+        text = "def foo():\n    return 42"
+        source, tree = self._py(text)
+        symbols = self._defs(source, tree)
+        func = next(s for s in symbols if s.name == "foo")
+        assert func.docstring == ""
 
     def test_extract_class_members_with_docstrings(self):
         text = (
@@ -560,7 +581,8 @@ class TestPythonDocstringExtraction:
             "    def multiply(self, a, b):\n"
             "        return a * b\n"
         )
-        members = self.provider._extract_class_members(text, "Calculator")
+        source, tree = self._py(text)
+        members = self._members(source, tree, "Calculator")
         add_item = next(m for m in members if m.name == "add")
         mul_item = next(m for m in members if m.name == "multiply")
         assert add_item.docstring == "Add two numbers."
@@ -575,7 +597,8 @@ class TestPythonDocstringExtraction:
             "    def farewell(self):\n"
             "        pass\n"
         )
-        members = self.provider._extract_self_completions(text, "Greeter")
+        source, tree = self._py(text)
+        members = self._self_members(source, tree, "Greeter")
         greet = next(m for m in members if m.name == "greet")
         farewell = next(m for m in members if m.name == "farewell")
         assert greet.docstring == "Greet someone by name."

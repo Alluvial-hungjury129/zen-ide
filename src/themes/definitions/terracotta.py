@@ -32,8 +32,6 @@ TERRACOTTA = Theme(
     tree_selected_bg="#3d2e26",
     tree_modified_fg="#c9a84c",
     # Terminal
-    term_bg="#1a1513",
-    term_fg="#e8ddd0",
     # Accent — terracotta orange
     accent_color="#d4845a",
     # Borders
@@ -57,7 +55,6 @@ TERRACOTTA = Theme(
     syntax_boolean="#c27a8e",
     # UI extras
     sash_color="#362c25",
-    term_cyan="#7ab0a6",
     search_match_bg="#4d3a2c",
     search_current_bg="#5a4232",
     is_dark=True,
@@ -73,6 +70,7 @@ TERRACOTTA = Theme(
     term_yellow="#c9a84c",
     term_blue="#7a8fa6",
     term_magenta="#c27a8e",
+    term_cyan="#7ab0a6",
     term_white="#e8ddd0",
     syntax_parameter="#e0956e",
     warning_color="#f0d050",

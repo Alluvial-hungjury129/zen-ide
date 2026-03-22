@@ -9,15 +9,13 @@ Zen IDE has deep, first-class support for **Python**, **JavaScript**, and **Terr
 Every fully supported language provides the following four features:
 
 ### Syntax Highlighting
-Powered by **GtkSourceView 5** and its built-in language definition library. Zen IDE extends this with additional `.lang` files for languages not covered by the standard distribution (e.g. Clojure). Highlighting is applied as you type with no latency penalty.
-
-> **Coming soon:** [Tree-sitter](https://tree-sitter.github.io/) integration will replace regex-based grammar parsing with a proper incremental AST, delivering more accurate and resilient highlighting across all languages.
+Powered by **GtkSourceView 5** and its built-in language definition library. Zen IDE extends this with additional `.lang` files for languages not covered by the standard distribution (e.g. Clojure). Highlighting is applied as you type with no latency penalty. A **semantic highlight layer** powered by Tree-sitter AST queries adds usage-site coloring (function calls, class references, parameters) on top of the GtkSourceView tokenization.
 
 ### Code Navigation
-Jump to any symbol definition with **Cmd+Click**. Navigation is implemented using **custom regex-based parsing** that resolves function definitions, class declarations, imports, and resource blocks without requiring an external language server.
+Jump to any symbol definition with **Cmd+Click**. Navigation is implemented using **Tree-sitter AST queries** that resolve function definitions, class declarations, imports, and resource blocks without requiring an external language server. Tree-sitter produces a full syntax tree, giving accurate results for async functions, type-hinted variables, decorated definitions, and nested classes.
 
 ### Autocompletion
-As you type, Zen suggests completions drawn from the current file's symbol index and language-specific knowledge. This is also built on **custom regex and AST heuristics** rather than an LSP, keeping startup fast and dependencies minimal.
+As you type, Zen suggests completions drawn from the current file's symbol index and language-specific knowledge. This is built on **Tree-sitter AST extraction** (signatures, docstrings, members) rather than an LSP, keeping startup fast and dependencies minimal.
 
 ### Debugger
 > **Coming soon.** Debugger support (breakpoints, step through, variable inspection) is planned for all supported languages via a DAP (Debug Adapter Protocol) integration.
@@ -31,8 +29,8 @@ As you type, Zen suggests completions drawn from the current file's symbol index
 | Capability | Status | Notes |
 |---|---|---|
 | Syntax highlighting | ✅ | GtkSourceView built-in + semantic layer |
-| Code navigation | ✅ | AST + regex, Cmd+Click to definition |
-| Autocompletion | ✅ | AST-based + introspection |
+| Code navigation | ✅ | Tree-sitter AST, Cmd+Click to definition |
+| Autocompletion | ✅ | Tree-sitter extraction + introspection |
 | Linting / diagnostics | ✅ | `ruff check` by default |
 | Format on save | ✅ | `ruff format` by default |
 | Debugger | 🔜 | Planned |
@@ -44,8 +42,8 @@ As you type, Zen suggests completions drawn from the current file's symbol index
 | Capability | Status | Notes |
 |---|---|---|
 | Syntax highlighting | ✅ | GtkSourceView built-in |
-| Code navigation | ✅ | Regex-based import resolution |
-| Autocompletion | ✅ | Babel-based symbol parsing |
+| Code navigation | ✅ | Tree-sitter import resolution |
+| Autocompletion | ✅ | Tree-sitter symbol parsing |
 | Linting / diagnostics | ✅ | `eslint` by default |
 | Format on save | ✅ | `prettier` by default |
 | Debugger | 🔜 | Planned |
@@ -55,7 +53,7 @@ As you type, Zen suggests completions drawn from the current file's symbol index
 | Capability | Status | Notes |
 |---|---|---|
 | Syntax highlighting | ✅ | GtkSourceView + custom HCL spec |
-| Code navigation | ✅ | Resource block regex matching |
+| Code navigation | ✅ | Tree-sitter resource block matching |
 | Autocompletion | ✅ | Schema-based HCL completion |
 | Linting / diagnostics | ✅ | Configurable |
 | Format on save | ✅ | Configurable |

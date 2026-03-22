@@ -12,3 +12,4 @@ test
 zen_ide.egg-info
 arch*
 build
+.claude/

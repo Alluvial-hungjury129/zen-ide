@@ -30,8 +30,6 @@ EGA_DREAMS = Theme(
     tree_modified_fg="#ffff55",
     tree_ignored_fg="#555555",
     # Terminal
-    term_bg="#141414",
-    term_fg="#aaaaaa",
     # Accent — EGA light cyan, the signature color
     accent_color="#55ffff",
     # Borders — subtle dark lines with EGA cyan focus
@@ -40,7 +38,6 @@ EGA_DREAMS = Theme(
     # Sash
     sash_color="#0e0e0e",
     # AI / Chat
-    term_cyan="#55ffff",
     # Search — EGA yellow highlight
     search_match_bg="#aa5500",
     search_current_bg="#ffff55",
@@ -71,6 +68,7 @@ EGA_DREAMS = Theme(
     term_yellow="#ffff55",
     term_blue="#5555ff",
     term_magenta="#ff55ff",
+    term_cyan="#55ffff",
     term_white="#aaaaaa",
     syntax_parameter="#ffff55",
     is_dark=True,

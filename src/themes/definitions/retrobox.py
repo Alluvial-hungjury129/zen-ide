@@ -30,8 +30,6 @@ RETROBOX = Theme(
     tree_modified_fg="#d7af5f",
     tree_ignored_fg="#585858",
     # Terminal
-    term_bg="#1c1c1c",
-    term_fg="#d0d0d0",
     # Accent - CGA cyan
     accent_color="#00afaf",
     # Borders
@@ -39,7 +37,6 @@ RETROBOX = Theme(
     border_focus="#00afaf",
     sash_color="#303030",
     # AI Chat
-    term_cyan="#00afaf",
     # Syntax - classic CGA 4-color palette feel
     syntax_keyword="#d75faf",
     syntax_string="#5faf5f",
@@ -67,6 +64,7 @@ RETROBOX = Theme(
     term_yellow="#d7af5f",
     term_blue="#5f87af",
     term_magenta="#d75faf",
+    term_cyan="#00afaf",
     term_white="#d0d0d0",
     syntax_parameter="#d7af5f",
     search_match_bg="#515c6a",

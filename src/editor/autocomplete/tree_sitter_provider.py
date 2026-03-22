@@ -107,15 +107,24 @@ def _extract_dataclass_fields(source: bytes, body_node) -> list[str]:
         if expr.type == "assignment":
             ann = expr.child_by_field_name("type")
             left = expr.child_by_field_name("left")
-            if left and left.type == "identifier" and ann:
-                name = _node_text(source, left)
-                fields.append(f"{name}: {_node_text(source, ann)}")
+            if not left or left.type != "identifier" or not ann:
+                continue
+            ann_text = _node_text(source, ann)
+            if ann_text.startswith("ClassVar"):
+                continue
+            right = expr.child_by_field_name("right")
+            if right and right.type == "call":
+                call_text = _node_text(source, right)
+                if "init=False" in call_text or "init = False" in call_text:
+                    continue
+            name = _node_text(source, left)
+            fields.append(f"{name}: {ann_text}")
         elif expr.type == "type":
             # Bare annotation: ``x: int``  (no default value)
-            # tree-sitter-python wraps these as ``type`` nodes
             text = _node_text(source, expr).strip()
             if ":" in text:
-                fields.append(text)
+                if not text.split(":")[-1].strip().startswith("ClassVar"):
+                    fields.append(text)
     return fields
 
 
@@ -445,6 +454,8 @@ def _extract_members_from_class(source: bytes, class_node, *, include_private: b
 def py_find_enclosing_class(source: bytes, tree, byte_offset: int) -> str | None:
     """Return the name of the class containing *byte_offset*, or None."""
     node = tree.root_node
+    # Clamp so cursor at end-of-file still matches the last enclosing node
+    byte_offset = min(byte_offset, max(0, node.end_byte - 1))
     result = None
 
     while True:
@@ -472,7 +483,7 @@ def py_find_enclosing_class(source: bytes, tree, byte_offset: int) -> str | None
 
 
 def py_resolve_variable_type(source: bytes, tree, var_name: str) -> str | None:
-    """Resolve a variable's class from ``var = ClassName(...)`` or ``var: Type = ...``."""
+    """Resolve a variable's class from ``var: Type = ...`` or ``var = ClassName(...)``."""
     root = tree.root_node
     for child in root.children:
         if child.type != "expression_statement" or child.child_count == 0:
@@ -483,16 +494,16 @@ def py_resolve_variable_type(source: bytes, tree, var_name: str) -> str | None:
         left = expr.child_by_field_name("left")
         if not left or left.type != "identifier" or _node_text(source, left) != var_name:
             continue
+        # Prefer explicit type annotation over inferred type from RHS
+        ann = expr.child_by_field_name("type")
+        if ann:
+            return _node_text(source, ann).split(".")[-1]
         right = expr.child_by_field_name("right")
         if right and right.type == "call":
             func = right.child_by_field_name("function")
             if func:
                 text = _node_text(source, func)
                 return text.split(".")[-1]
-        # var: Type = ...
-        ann = expr.child_by_field_name("type")
-        if ann:
-            return _node_text(source, ann).split(".")[-1]
     return None
 
 

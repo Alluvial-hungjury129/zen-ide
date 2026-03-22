@@ -25,8 +25,11 @@ navigation/
 ├── code_navigation_ts.py    # TypeScript/JS navigation
 ├── code_navigation_tf.py    # Terraform navigation
 ├── navigation_provider.py   # Base provider interface
-├── custom_provider.py       # Generic/custom navigation
-└── terraform_provider.py    # Terraform-specific provider
+├── tree_sitter_core.py      # Lazy parser manager (language registry, caching)
+├── tree_sitter_queries.py   # S-expression query definitions per language
+├── tree_sitter_py_provider.py  # Python provider using Tree-sitter
+├── tree_sitter_ts_provider.py  # TS/JS provider using Tree-sitter
+└── tree_sitter_tf_provider.py  # Terraform provider using Tree-sitter
 ```
 
 ## Components

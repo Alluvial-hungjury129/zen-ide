@@ -30,8 +30,6 @@ LASERWAVE = Theme(
     tree_modified_fg="#ffe261",
     tree_ignored_fg="#7b6995",
     # Terminal
-    term_bg="#27212e",
-    term_fg="#ffffff",
     # Accent
     accent_color="#eb64b9",
     # Borders
@@ -39,7 +37,6 @@ LASERWAVE = Theme(
     border_focus="#eb64b9",
     sash_color="#3d3348",
     # AI Chat
-    term_cyan="#b4dce7",
     # Syntax
     syntax_keyword="#74dfc4",
     syntax_string="#b4dce7",
@@ -67,6 +64,7 @@ LASERWAVE = Theme(
     term_yellow="#ffe261",
     term_blue="#40b4c4",
     term_magenta="#b381c5",
+    term_cyan="#b4dce7",
     term_white="#ffffff",
     syntax_parameter="#b381c5",
     search_match_bg="#515c6a",

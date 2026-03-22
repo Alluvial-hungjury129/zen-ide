@@ -30,8 +30,6 @@ AURORA_BOREALIS = Theme(
     tree_modified_fg="#5ccfe6",
     tree_ignored_fg="#3d5065",
     # Terminal
-    term_bg="#0f1219",
-    term_fg="#c7d5e0",
     # Accent — aurora green
     accent_color="#7fefbd",
     # Borders
@@ -40,7 +38,6 @@ AURORA_BOREALIS = Theme(
     # Sash
     sash_color="#0b0e14",
     # AI / Chat
-    term_cyan="#5ccfe6",
     # Search
     search_match_bg="#2a4a3a",
     search_current_bg="#3a6a4a",
@@ -71,6 +68,7 @@ AURORA_BOREALIS = Theme(
     term_yellow="#f0c674",
     term_blue="#5ccfe6",
     term_magenta="#c594ff",
+    term_cyan="#5ccfe6",
     term_white="#c7d5e0",
     syntax_parameter="#ffad66",
     is_dark=True,

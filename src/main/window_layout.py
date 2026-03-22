@@ -64,10 +64,10 @@ class WindowLayoutMixin:
                 background-color: {theme.main_bg};
             }}
             .terminal {{
-                background-color: {theme.term_bg};
+                background-color: {theme.panel_bg};
             }}
             .terminal:backdrop {{
-                background-color: {theme.term_bg};
+                background-color: {theme.panel_bg};
             }}
             paned > separator {{
                 background-color: {theme.sash_color};
@@ -225,10 +225,10 @@ class WindowLayoutMixin:
                 background-color: {theme.main_bg};
             }}
             .terminal {{
-                background-color: {theme.term_bg};
+                background-color: {theme.panel_bg};
             }}
             .terminal:backdrop {{
-                background-color: {theme.term_bg};
+                background-color: {theme.panel_bg};
             }}
             .terminal-scrolled {{
                 padding-left: 8px;

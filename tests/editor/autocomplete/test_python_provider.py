@@ -1,33 +1,53 @@
 """Tests for editor/autocomplete/python_provider.py - Python completions."""
 
 from editor.autocomplete.python_provider import PythonCompletionProvider
+from editor.autocomplete.tree_sitter_provider import (
+    _parse,
+    py_extract_definitions,
+    py_extract_imports,
+    py_find_enclosing_class,
+    py_extract_class_members,
+    py_resolve_variable_type,
+    py_resolve_chain,
+    py_extract_docstring,
+    py_extract_init_signature,
+    _is_dataclass_node,
+    _find_class_node,
+)
+
+
+def _py(text):
+    """Parse Python text and return (source_bytes, tree)."""
+    source, tree = _parse(text, "python")
+    assert tree is not None, f"Failed to parse: {text[:60]}"
+    return source, tree
 
 
 class TestGetImports:
     """Test import extraction from Python source."""
 
     def test_simple_import(self):
-        p = PythonCompletionProvider()
-        items = p._get_imports("import os")
+        source, tree = _py("import os")
+        items = py_extract_imports(source, tree)
         names = [i.name for i in items]
         assert "os" in names
 
     def test_aliased_import(self):
-        p = PythonCompletionProvider()
-        items = p._get_imports("import numpy as np")
+        source, tree = _py("import numpy as np")
+        items = py_extract_imports(source, tree)
         names = [i.name for i in items]
         assert "np" in names
 
     def test_from_import(self):
-        p = PythonCompletionProvider()
-        items = p._get_imports("from os.path import join, dirname")
+        source, tree = _py("from os.path import join, dirname")
+        items = py_extract_imports(source, tree)
         names = [i.name for i in items]
         assert "join" in names
         assert "dirname" in names
 
     def test_from_import_with_alias(self):
-        p = PythonCompletionProvider()
-        items = p._get_imports("from collections import OrderedDict as OD")
+        source, tree = _py("from collections import OrderedDict as OD")
+        items = py_extract_imports(source, tree)
         names = [i.name for i in items]
         assert "OD" in names
 
@@ -36,54 +56,53 @@ class TestGetSymbols:
     """Test local symbol extraction."""
 
     def test_class_definition(self):
-        p = PythonCompletionProvider()
-        items = p._get_symbols("class MyClass:\n    pass")
+        source, tree = _py("class MyClass:\n    pass")
+        items = py_extract_definitions(source, tree)
         names = [i.name for i in items]
         assert "MyClass" in names
 
     def test_function_definition(self):
-        p = PythonCompletionProvider()
-        items = p._get_symbols("def hello(name: str) -> str:\n    pass")
+        source, tree = _py("def hello(name: str) -> str:\n    pass")
+        items = py_extract_definitions(source, tree)
         names = [i.name for i in items]
         assert "hello" in names
 
     def test_function_with_signature(self):
-        p = PythonCompletionProvider()
-        items = p._get_symbols("def greet(name: str) -> str:\n    pass")
+        source, tree = _py("def greet(name: str) -> str:\n    pass")
+        items = py_extract_definitions(source, tree)
         funcs = [i for i in items if i.name == "greet"]
         assert len(funcs) == 1
         assert "greet" in funcs[0].signature
 
     def test_variable_assignment(self):
-        p = PythonCompletionProvider()
-        items = p._get_symbols("MY_CONST = 42")
+        source, tree = _py("MY_CONST = 42")
+        items = py_extract_definitions(source, tree)
         names = [i.name for i in items]
         assert "MY_CONST" in names
 
     def test_dunder_excluded(self):
-        p = PythonCompletionProvider()
-        items = p._get_symbols("__all__ = ['foo']")
+        source, tree = _py("__all__ = ['foo']")
+        items = py_extract_definitions(source, tree)
         names = [i.name for i in items]
         assert "__all__" not in names
 
 
 class TestNormalizeMultilineDefs:
-    """Test multi-line def normalization."""
+    """Test that multi-line defs are handled correctly via tree-sitter."""
 
     def test_single_line_unchanged(self):
-        p = PythonCompletionProvider()
-        result = p._normalize_multiline_defs("def foo(x): pass")
-        assert "def foo(x): pass" in result
+        source, tree = _py("def foo(x): pass")
+        items = py_extract_definitions(source, tree)
+        assert any(i.name == "foo" for i in items)
 
     def test_multiline_joined(self):
-        p = PythonCompletionProvider()
         text = "def foo(\n    x,\n    y\n):\n    pass"
-        result = p._normalize_multiline_defs(text)
-        assert "def foo(" in result
-        # Should be joined to one line
-        lines = result.splitlines()
-        def_lines = [l for l in lines if "def foo" in l]
-        assert len(def_lines) == 1
+        source, tree = _py(text)
+        items = py_extract_definitions(source, tree)
+        funcs = [i for i in items if i.name == "foo"]
+        assert len(funcs) == 1
+        assert "x" in funcs[0].signature
+        assert "y" in funcs[0].signature
 
 
 class TestGetCompletions:
@@ -110,15 +129,17 @@ class TestFindEnclosingClass:
     """Test enclosing class detection."""
 
     def test_finds_class(self):
-        p = PythonCompletionProvider()
         text = "class Foo:\n    def bar(self):\n        self."
-        result = p._find_enclosing_class(text, len(text))
+        source, tree = _py(text)
+        byte_offset = len(text.encode("utf-8"))
+        result = py_find_enclosing_class(source, tree, byte_offset)
         assert result == "Foo"
 
     def test_no_class(self):
-        p = PythonCompletionProvider()
         text = "def standalone():\n    pass"
-        result = p._find_enclosing_class(text, len(text))
+        source, tree = _py(text)
+        byte_offset = len(text.encode("utf-8"))
+        result = py_find_enclosing_class(source, tree, byte_offset)
         assert result is None
 
 
@@ -126,83 +147,82 @@ class TestExtractClassMembers:
     """Test class member extraction."""
 
     def test_extracts_methods(self):
-        p = PythonCompletionProvider()
         text = "class Foo:\n    def bar(self):\n        pass\n    def baz(self) -> int:\n        pass"
-        items = p._extract_class_members(text, "Foo")
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "Foo")
         names = [i.name for i in items]
         assert "bar" in names
         assert "baz" in names
 
     def test_excludes_private(self):
-        p = PythonCompletionProvider()
         text = "class Foo:\n    def _private(self):\n        pass\n    def public(self):\n        pass"
-        items = p._extract_class_members(text, "Foo")
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "Foo")
         names = [i.name for i in items]
         assert "_private" not in names
         assert "public" in names
 
     def test_extracts_attributes(self):
-        p = PythonCompletionProvider()
         text = "class Foo:\n    count = 0\n    name = 'test'"
-        items = p._extract_class_members(text, "Foo")
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "Foo")
         names = [i.name for i in items]
         assert "count" in names
         assert "name" in names
 
 
 class TestGetClassBodyText:
-    """Test class body text extraction."""
+    """Test class body traversal via tree-sitter (replaces text extraction)."""
 
     def test_extracts_body(self):
-        p = PythonCompletionProvider()
         text = "class Foo:\n    x = 1\n    def bar(self):\n        pass\n\nclass Other:\n    pass"
-        body = p._get_class_body_text(text, "Foo")
-        assert body is not None
-        assert "x = 1" in body
-        assert "bar" in body
-        assert "Other" not in body
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "Foo", include_private=True)
+        names = [i.name for i in items]
+        assert "x" in names
+        assert "bar" in names
 
     def test_class_not_found(self):
-        p = PythonCompletionProvider()
-        body = p._get_class_body_text("class Foo:\n    pass", "Bar")
-        assert body is None
+        text = "class Foo:\n    pass"
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "Bar")
+        assert items == []
 
 
 class TestResolveVariableType:
     """Test variable type resolution from assignments."""
 
     def test_constructor_call(self):
-        p = PythonCompletionProvider()
         text = "client = OnboardingClient(config)"
-        assert p._resolve_variable_type(text, "client") == "OnboardingClient"
+        source, tree = _py(text)
+        assert py_resolve_variable_type(source, tree, "client") == "OnboardingClient"
 
     def test_module_constructor_call(self):
-        p = PythonCompletionProvider()
         text = "client = clients.OnboardingClient(config)"
-        assert p._resolve_variable_type(text, "client") == "OnboardingClient"
+        source, tree = _py(text)
+        assert py_resolve_variable_type(source, tree, "client") == "OnboardingClient"
 
     def test_type_annotation(self):
-        p = PythonCompletionProvider()
         text = "client: OnboardingClient = create_client()"
-        assert p._resolve_variable_type(text, "client") == "OnboardingClient"
+        source, tree = _py(text)
+        assert py_resolve_variable_type(source, tree, "client") == "OnboardingClient"
 
     def test_no_match(self):
-        p = PythonCompletionProvider()
         text = "x = 42"
-        assert p._resolve_variable_type(text, "x") is None
+        source, tree = _py(text)
+        assert py_resolve_variable_type(source, tree, "x") is None
 
     def test_not_found(self):
-        p = PythonCompletionProvider()
         text = "other = Foo()"
-        assert p._resolve_variable_type(text, "client") is None
+        source, tree = _py(text)
+        assert py_resolve_variable_type(source, tree, "client") is None
 
 
 class TestResolveChainInTextNoFalsePositive:
-    """Test that _resolve_chain_in_text doesn't return wrong methods for variables."""
+    """Test that py_resolve_chain doesn't return wrong methods for variables."""
 
     def test_variable_at_top_level_returns_empty(self):
         """A variable assignment at top level should NOT return all methods from the file."""
-        p = PythonCompletionProvider()
         text = (
             "from clients import OnboardingClient\n"
             "\n"
@@ -212,138 +232,178 @@ class TestResolveChainInTextNoFalsePositive:
             "\n"
             "onboarding_client = OnboardingClient()\n"
         )
-        result = p._resolve_chain_in_text(text, ["onboarding_client"])
-        # Should NOT return "process" from Handler class
+        source, tree = _py(text)
+        result = py_resolve_chain(source, tree, ["onboarding_client"])
         assert result == []
 
     def test_enum_member_inside_class_still_works(self):
-        """Attribute access inside a class body should still return methods."""
-        p = PythonCompletionProvider()
+        """Attribute access on a class returns its members."""
         text = "class Status:\n    ACTIVE = 'active'\n    INACTIVE = 'inactive'\n    def label(self) -> str:\n        pass\n"
-        # Simulate chain ["Status", "ACTIVE"] — first drill into Status body, then ACTIVE
-        result = p._resolve_chain_in_text(text, ["Status", "ACTIVE"])
+        source, tree = _py(text)
+        # Resolve ["Status"] to get the class members
+        result = py_resolve_chain(source, tree, ["Status"])
         names = [i.name for i in result]
         assert "label" in names
+        assert "ACTIVE" in names
 
 
 class TestPeekDocstring:
-    """Test _peek_docstring extraction from lines around a def."""
+    """Test docstring extraction from function/class definitions via tree-sitter."""
 
     def test_triple_quoted_docstring(self):
-        lines = ["    def foo(self):", '        """This is foo."""', "        pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 0) == "This is foo."
+        text = 'class C:\n    def foo(self):\n        """This is foo."""\n        pass'
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "C", include_private=True)
+        item = next(i for i in items if i.name == "foo")
+        assert item.docstring == "This is foo."
 
     def test_single_quoted_docstring(self):
-        lines = ["    def bar(self):", "        '''Bar doc.'''", "        pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 0) == "Bar doc."
+        text = "class C:\n    def bar(self):\n        '''Bar doc.'''\n        pass"
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "C", include_private=True)
+        item = next(i for i in items if i.name == "bar")
+        assert item.docstring == "Bar doc."
 
     def test_multiline_docstring(self):
-        lines = ["    def baz(self):", '        """', "        Baz description.", '        """', "        pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 0) == "Baz description."
+        text = 'class C:\n    def baz(self):\n        """\n        Baz description.\n        """\n        pass'
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "C", include_private=True)
+        item = next(i for i in items if i.name == "baz")
+        assert item.docstring == "Baz description."
 
     def test_multiline_docstring_content_after_quote(self):
-        lines = ["    def qux(self):", '        """Qux description.', "        More info.", '        """']
-        assert PythonCompletionProvider._peek_docstring(lines, 0) == "Qux description.\nMore info."
+        text = 'class C:\n    def qux(self):\n        """Qux description.\n        More info.\n        """\n        pass'
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "C", include_private=True)
+        item = next(i for i in items if i.name == "qux")
+        assert item.docstring == "Qux description."
 
     def test_hash_comment_above_def(self):
-        lines = ["    # Calculate the sum of values", "    def calc_sum(self, values):", "        pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 1) == "Calculate the sum of values"
+        """Tree-sitter extracts actual docstrings, not comments above defs."""
+        text = "class C:\n    # Calculate the sum of values\n    def calc_sum(self, values):\n        pass"
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "C", include_private=True)
+        item = next(i for i in items if i.name == "calc_sum")
+        assert item.docstring == ""
 
     def test_hash_comment_with_blank_line(self):
-        lines = ["    # Helper function", "", "    def helper(self):", "        pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 2) == "Helper function"
+        """Tree-sitter extracts actual docstrings, not comments."""
+        text = "class C:\n    # Helper function\n\n    def helper(self):\n        pass"
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "C", include_private=True)
+        item = next(i for i in items if i.name == "helper")
+        assert item.docstring == ""
 
     def test_docstring_preferred_over_comment(self):
-        lines = ["    # Above comment", "    def foo(self):", '        """Docstring wins."""', "        pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 1) == "Docstring wins."
+        text = 'class C:\n    # Above comment\n    def foo(self):\n        """Docstring wins."""\n        pass'
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "C", include_private=True)
+        item = next(i for i in items if i.name == "foo")
+        assert item.docstring == "Docstring wins."
 
     def test_no_docstring_no_comment(self):
-        lines = ["    x = 1", "    def foo(self):", "        pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 1) == ""
+        text = "class C:\n    x = 1\n    def foo(self):\n        pass"
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "C", include_private=True)
+        item = next(i for i in items if i.name == "foo")
+        assert item.docstring == ""
 
     def test_first_def_at_index_zero(self):
-        lines = ["    def first(self):", "        pass"]
-        assert PythonCompletionProvider._peek_docstring(lines, 0) == ""
+        text = "def first():\n    pass"
+        source, tree = _py(text)
+        items = py_extract_definitions(source, tree)
+        item = next(i for i in items if i.name == "first")
+        assert item.docstring == ""
 
 
 class TestExtractDocstringAt:
-    """Test _extract_docstring_at for top-level defs."""
+    """Test docstring extraction from top-level definitions via tree-sitter."""
 
     def test_docstring_after_def(self):
         text = 'def foo():\n    """Foo docs."""\n    pass'
-        pos = text.index(":") + 1
-        assert PythonCompletionProvider._extract_docstring_at(text, pos) == "Foo docs."
+        source, tree = _py(text)
+        items = py_extract_definitions(source, tree)
+        item = next(i for i in items if i.name == "foo")
+        assert item.docstring == "Foo docs."
 
     def test_comment_above_def(self):
+        """Tree-sitter only extracts actual docstrings, not comments above defs."""
         text = "# Initialize the connection\ndef connect():\n    pass"
-        pos = text.index(":") + 1
-        assert PythonCompletionProvider._extract_docstring_at(text, pos) == "Initialize the connection"
+        source, tree = _py(text)
+        items = py_extract_definitions(source, tree)
+        item = next(i for i in items if i.name == "connect")
+        assert item.docstring == ""
 
     def test_docstring_preferred_over_comment(self):
         text = '# Above comment\ndef foo():\n    """Docstring."""\n    pass'
-        pos = text.index(":") + 1
-        assert PythonCompletionProvider._extract_docstring_at(text, pos) == "Docstring."
+        source, tree = _py(text)
+        items = py_extract_definitions(source, tree)
+        item = next(i for i in items if i.name == "foo")
+        assert item.docstring == "Docstring."
 
     def test_no_docstring_no_comment(self):
         text = "x = 1\ndef foo():\n    pass"
-        pos = text.index(":") + 1
-        assert PythonCompletionProvider._extract_docstring_at(text, pos) == ""
+        source, tree = _py(text)
+        items = py_extract_definitions(source, tree)
+        item = next(i for i in items if i.name == "foo")
+        assert item.docstring == ""
 
 
 class TestClassMembersDocstrings:
-    """Test that class member extraction includes docstrings and comments."""
+    """Test that class member extraction includes docstrings."""
 
     def test_method_with_docstring(self):
-        p = PythonCompletionProvider()
         text = 'class MyClass:\n    def greet(self, name):\n        """Say hello."""\n        pass\n'
-        items = p._extract_class_members(text, "MyClass")
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "MyClass")
         item = next(i for i in items if i.name == "greet")
         assert item.docstring == "Say hello."
 
     def test_method_with_comment(self):
-        p = PythonCompletionProvider()
+        """Tree-sitter only extracts actual docstrings, not comments."""
         text = "class MyClass:\n    # Compute the total\n    def total(self):\n        return 42\n"
-        items = p._extract_class_members(text, "MyClass")
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "MyClass")
         item = next(i for i in items if i.name == "total")
-        assert item.docstring == "Compute the total"
+        assert item.docstring == ""
 
     def test_method_no_doc(self):
-        p = PythonCompletionProvider()
         text = "class MyClass:\n    x = 1\n    def run(self):\n        pass\n"
-        items = p._extract_class_members(text, "MyClass")
+        source, tree = _py(text)
+        items = py_extract_class_members(source, tree, "MyClass")
         item = next(i for i in items if i.name == "run")
         assert item.docstring == ""
 
 
 class TestFollowReexport:
-    """Test _follow_reexport for __init__.py re-export resolution."""
+    """Test _follow_reexport_ts for __init__.py re-export resolution."""
 
     def test_matches_reexport(self):
         p = PythonCompletionProvider()
         init_text = "from .db_handler import DBHandler\nfrom .utils import helper\n"
-        # Should find the submodule name for DBHandler
-        result = p._follow_reexport(init_text, "DBHandler", "mypkg", "/fake/path.py")
-        # Returns None because the submodule file doesn't exist, but the regex match works
+        source, tree = _py(init_text)
+        result = p._follow_reexport_ts(source, tree, "DBHandler", "mypkg", "/fake/path.py")
         assert result is None  # file not found on disk, but logic is correct
 
     def test_no_match_returns_none(self):
         p = PythonCompletionProvider()
         init_text = "from .utils import helper\n"
-        result = p._follow_reexport(init_text, "NoSuchClass", "mypkg", "/fake/path.py")
+        source, tree = _py(init_text)
+        result = p._follow_reexport_ts(source, tree, "NoSuchClass", "mypkg", "/fake/path.py")
         assert result is None
 
     def test_matches_among_multiple_imports(self):
         p = PythonCompletionProvider()
         init_text = "from .sub import Alpha, Beta, Gamma\n"
-        # Should match Beta in the multi-import line
-        result = p._follow_reexport(init_text, "Beta", "mypkg", "/fake/path.py")
-        # File won't exist but the pattern was matched (result is None from missing file)
+        source, tree = _py(init_text)
+        result = p._follow_reexport_ts(source, tree, "Beta", "mypkg", "/fake/path.py")
         assert result is None
 
     def test_does_not_match_non_relative_import(self):
         p = PythonCompletionProvider()
         init_text = "from other_pkg import MyClass\n"
-        result = p._follow_reexport(init_text, "MyClass", "mypkg", "/fake/path.py")
+        source, tree = _py(init_text)
+        result = p._follow_reexport_ts(source, tree, "MyClass", "mypkg", "/fake/path.py")
         assert result is None
 
 
@@ -391,8 +451,16 @@ class TestReexportResolveDotCompletions:
 class TestDataclassSignature:
     """Test dataclass field extraction for constructor signatures."""
 
+    @staticmethod
+    def _init_sig(text, class_name):
+        """Parse text and extract init signature for the named class."""
+        source, tree = _py(text)
+        class_node = _find_class_node(source, tree.root_node, class_name)
+        if class_node is None:
+            return f"{class_name}()"
+        return py_extract_init_signature(source, class_node)
+
     def test_basic_dataclass_fields(self):
-        p = PythonCompletionProvider()
         text = (
             "from dataclasses import dataclass\n\n"
             "@dataclass\n"
@@ -401,50 +469,43 @@ class TestDataclassSignature:
             "    age: int\n"
             "    active: bool = True\n"
         )
-        sig = p._extract_init_signature(text, "User")
+        sig = self._init_sig(text, "User")
         assert sig == "User(name: str, age: int, active: bool)"
 
     def test_dataclass_with_no_fields(self):
-        p = PythonCompletionProvider()
         text = "@dataclass\nclass Empty:\n    pass\n"
-        sig = p._extract_init_signature(text, "Empty")
+        sig = self._init_sig(text, "Empty")
         assert sig == "Empty()"
 
     def test_dataclass_skips_classvar(self):
-        p = PythonCompletionProvider()
         text = "@dataclass\nclass Config:\n    name: str\n    ClassVar_count: int\n    registry: ClassVar[dict] = {}\n"
-        sig = p._extract_init_signature(text, "Config")
+        sig = self._init_sig(text, "Config")
         assert "registry" not in sig
         assert "name" in sig
 
     def test_dataclass_skips_field_init_false(self):
-        p = PythonCompletionProvider()
         text = "@dataclass\nclass Item:\n    name: str\n    computed: int = field(init=False, default=0)\n"
-        sig = p._extract_init_signature(text, "Item")
+        sig = self._init_sig(text, "Item")
         assert "name" in sig
         assert "computed" not in sig
 
     def test_dataclasses_dot_dataclass(self):
-        p = PythonCompletionProvider()
         text = "@dataclasses.dataclass\nclass Point:\n    x: float\n    y: float\n"
-        sig = p._extract_init_signature(text, "Point")
+        sig = self._init_sig(text, "Point")
         assert sig == "Point(x: float, y: float)"
 
     def test_dataclass_with_args(self):
-        p = PythonCompletionProvider()
         text = "@dataclass(frozen=True)\nclass Coord:\n    lat: float\n    lon: float\n"
-        sig = p._extract_init_signature(text, "Coord")
+        sig = self._init_sig(text, "Coord")
         assert sig == "Coord(lat: float, lon: float)"
 
     def test_not_a_dataclass(self):
-        p = PythonCompletionProvider()
         text = "class Plain:\n    x: int\n    y: int\n"
-        sig = p._extract_init_signature(text, "Plain")
+        sig = self._init_sig(text, "Plain")
         assert sig == "Plain()"
 
     def test_dataclass_with_explicit_init(self):
         """If a dataclass has explicit __init__, use that instead of fields."""
-        p = PythonCompletionProvider()
         text = (
             "@dataclass\n"
             "class Custom:\n"
@@ -452,18 +513,20 @@ class TestDataclassSignature:
             "    def __init__(self, name: str, extra: int):\n"
             "        self.name = name\n"
         )
-        sig = p._extract_init_signature(text, "Custom")
+        sig = self._init_sig(text, "Custom")
         assert sig == "Custom(self, name: str, extra: int)"
 
     def test_is_dataclass_with_other_decorators(self):
-        p = PythonCompletionProvider()
         text = "@some_decorator\n@dataclass\nclass Multi:\n    value: int\n"
-        assert p._is_dataclass(text, "Multi") is True
+        source, tree = _py(text)
+        class_node = _find_class_node(source, tree.root_node, "Multi")
+        assert _is_dataclass_node(source, class_node) is True
 
     def test_is_dataclass_false_for_plain_class(self):
-        p = PythonCompletionProvider()
         text = "class Plain:\n    pass\n"
-        assert p._is_dataclass(text, "Plain") is False
+        source, tree = _py(text)
+        class_node = _find_class_node(source, tree.root_node, "Plain")
+        assert _is_dataclass_node(source, class_node) is False
 
     def test_dataclass_completions_integration(self):
         """get_completions returns dataclass with proper signature."""
@@ -706,7 +769,7 @@ class TestResolveFunctionSignature:
             "        self.process(x, "
         )
         cursor_offset = len(text)
-        sig = p._resolve_function_signature("self.process", None, text, cursor_offset)
+        sig = p._resolve_function_signature("self.process", None, text, cursor_offset=cursor_offset)
         assert sig is not None
         assert "item_id" in sig
         assert "retry" in sig

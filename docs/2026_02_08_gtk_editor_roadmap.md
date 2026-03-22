@@ -70,7 +70,7 @@ GtkSourceView is purely an editor widget—it does **not** provide intellisense 
 
 **Options:**
 - LSP client (`textDocument/documentSymbol`, `workspace/symbol`)
-- Custom parsing with regex
+- Custom parsing with Tree-sitter AST queries
 
 ---
 

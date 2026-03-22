@@ -40,10 +40,6 @@ class Theme:
     tree_selected_bg: str
     tree_modified_fg: str
 
-    # Terminal
-    term_bg: str
-    term_fg: str
-
     # Accent
     accent_color: str
 
@@ -91,9 +87,6 @@ class Theme:
     # Diagnostic colors
     warning_color: str
 
-    # Terminal cyan (used for ANSI palette and previews)
-    term_cyan: str
-
     # Terminal ANSI colors
     term_black: str
     term_red: str
@@ -101,6 +94,7 @@ class Theme:
     term_yellow: str
     term_blue: str
     term_magenta: str
+    term_cyan: str
     term_white: str
 
     def get_syntax_color(self, attr: str) -> str:

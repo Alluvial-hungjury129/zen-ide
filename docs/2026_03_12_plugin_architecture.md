@@ -365,7 +365,7 @@ class NavigationProvider(ABC):
 ```
 
 **Implementations:**
-- `CustomProvider` - Regex-based navigation
+- `CustomProvider` - Tree-sitter-based navigation
 - `TerraformProvider` - HCL-specific logic
 
 **Usage:**

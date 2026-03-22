@@ -30,8 +30,6 @@ SYNTHWAVE84 = Theme(
     tree_modified_fg="#fede5d",
     tree_ignored_fg="#495495",
     # Terminal
-    term_bg="#262335",
-    term_fg="#f0e8ff",
     # Accent - neon pink
     accent_color="#ff7edb",
     # Borders
@@ -39,7 +37,6 @@ SYNTHWAVE84 = Theme(
     border_focus="#ff7edb",
     sash_color="#34294f",
     # AI Chat
-    term_cyan="#36f9f6",
     # Syntax - full neon palette
     syntax_keyword="#fede5d",
     syntax_string="#ff8b39",
@@ -67,6 +64,7 @@ SYNTHWAVE84 = Theme(
     term_yellow="#fede5d",
     term_blue="#36f9f6",
     term_magenta="#ff7edb",
+    term_cyan="#36f9f6",
     term_white="#f0e8ff",
     syntax_parameter="#f97e72",
     search_match_bg="#515c6a",

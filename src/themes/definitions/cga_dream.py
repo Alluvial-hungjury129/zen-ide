@@ -30,8 +30,6 @@ CGA_DREAM = Theme(
     tree_modified_fg="#55ffff",
     tree_ignored_fg="#303870",
     # Terminal
-    term_bg="#06061c",
-    term_fg="#d0d8ff",
     # Accent — CGA magenta, the showstopper
     accent_color="#ff55ff",
     # Borders — barely-there blue phosphor lines
@@ -40,7 +38,6 @@ CGA_DREAM = Theme(
     # Sash
     sash_color="#000000",
     # AI / Chat
-    term_cyan="#55ffff",
     # Search — high-contrast yellow block cursor
     search_match_bg="#555500",
     search_current_bg="#888800",
@@ -71,6 +68,7 @@ CGA_DREAM = Theme(
     term_yellow="#ffff55",
     term_blue="#5555ff",
     term_magenta="#ff55ff",
+    term_cyan="#55ffff",
     term_white="#d0d8ff",
     syntax_parameter="#ffff55",
     is_dark=True,

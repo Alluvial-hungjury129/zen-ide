@@ -66,7 +66,7 @@ make install      # Install dependencies with uv
   - `src/ai/` - AI chat: HTTP providers (Anthropic, OpenAI, Copilot), tool use, ChatCanvas rendering
   - `src/editor/` - Editor components (editor, diff view, dev pad, markdown/openapi preview)
   - `src/popups/` - Dialogs and floating windows (NvimPopup base class)
-  - `src/navigation/` - Code navigation (go to definition via regex)
+  - `src/navigation/` - Code navigation (go to definition via Tree-sitter AST queries)
   - `src/sketch_pad/` - ASCII drawing tool
   - `src/icons/` - Centralised icon definitions and rendering helpers
   - `src/fonts/` - Font management

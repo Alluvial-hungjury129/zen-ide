@@ -29,16 +29,11 @@ ZX_DREAMS = Theme(
     tree_modified_fg="#d7d700",
     tree_ignored_fg="#4a4a70",
     # terminal
-    term_bg="#0d0d1a",
-    term_fg="#d7d7d7",
     # accents — Spectrum bright cyan
     accent_color="#00d7d7",
     border_color="#0000c5",
     border_focus="#00d7d7",
     sash_color="#0000c5",
-    # chat
-    term_cyan="#00d7d7",
-    # AI processing
     # search
     search_match_bg="#0000c5",
     search_current_bg="#00d700",
@@ -69,6 +64,7 @@ ZX_DREAMS = Theme(
     term_yellow="#d7d700",
     term_blue="#0000d7",
     term_magenta="#d700d7",
+    term_cyan="#00d7d7",
     term_white="#d7d7d7",
     syntax_parameter="#00d7d7",
     is_dark=True,

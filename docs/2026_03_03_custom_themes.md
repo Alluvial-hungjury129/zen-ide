@@ -55,15 +55,13 @@ Custom themes are stored as JSON files matching the `Theme` dataclass structure:
   "tree_modified_fg": "#d9c020",
   "tree_ignored_fg": "#606080",
   
-  "term_bg": "#1a1a2e",
-  "term_fg": "#cccccc",
-  "term_cyan": "#11a8cd",
   "term_black": "#1a1a2e",
   "term_red": "#e06c75",
   "term_green": "#98c379",
   "term_yellow": "#e5c07b",
   "term_blue": "#61afef",
   "term_magenta": "#c678dd",
+  "term_cyan": "#11a8cd",
   "term_white": "#abb2bf",
   
   "accent_color": "#e94560",
@@ -111,8 +109,7 @@ Custom themes are stored as JSON files matching the `Theme` dataclass structure:
 | Editor (`line_number_*`, `caret_fg`, `indent_guide`) | `git_*` colors |
 | Tabs (`tab_*`) | `warning_color` |
 | Tree (`tree_*`) | Terminal ANSI colors |
-| Terminal (`term_bg`, `term_fg`) | `sash_color` |
-| Syntax (`syntax_keyword` through `syntax_operator`) | |
+| Syntax (`syntax_keyword` through `syntax_operator`) | `sash_color` |
 | Accent (`accent_color`) | |
 | Borders (`border_color`, `border_focus`) | |
 

@@ -29,15 +29,12 @@ C64_VIDEOGAME_DREAMS = Theme(
     tree_modified_fg="#aaff66",
     tree_ignored_fg="#3a3a58",
     # terminal
-    term_bg="#0c0c1e",
-    term_fg="#c8c8d0",
     # accents — classic C64 light blue
     accent_color="#6c9cf6",
     border_color="#2a2a48",
     border_focus="#6c9cf6",
     sash_color="#2a2a48",
     # chat
-    term_cyan="#aaffee",
     # syntax — vivid sprite colors
     syntax_keyword="#ff7777",
     syntax_string="#aaff66",
@@ -53,6 +50,7 @@ C64_VIDEOGAME_DREAMS = Theme(
     term_yellow="#eeee77",
     term_blue="#6c9cf6",
     term_magenta="#cc77cc",
+    term_cyan="#aaffee",
     term_white="#c8c8d0",
     syntax_keyword_control="#ff7777",
     syntax_variable="#c8c8d0",

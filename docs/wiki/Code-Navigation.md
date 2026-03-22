@@ -51,7 +51,7 @@ The Terraform navigator resolves:
 When you click on a symbol, the navigation system:
 1. Parses the import statement or symbol reference
 2. Searches for the source file across the workspace
-3. Uses regex patterns to locate the exact definition (`class`, `def`, `function`, `const`, etc.)
+3. Uses **Tree-sitter AST queries** to locate the exact definition (class, function, variable, interface, etc.)
 4. Opens the file and scrolls to the definition
 
 ## Settings

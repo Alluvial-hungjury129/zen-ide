@@ -12,8 +12,6 @@
 
 Zen IDE's go-to-definition (`Cmd+Click`) now uses **Tree-sitter** for parsing source code instead of regex patterns. Tree-sitter produces a full Abstract Syntax Tree (AST) that is queried with S-expression patterns, giving accurate results for constructs that regex can't handle (async functions, type-hinted variables, complex imports with comments, nested definitions).
 
-The regex-based system is preserved as a fallback — if tree-sitter fails or is unavailable, navigation transparently degrades to the original regex implementation.
-
 ## Architecture
 
 ```
@@ -25,10 +23,10 @@ src/navigation/
 ├── code_navigation.py           # Dispatcher (unchanged interface)
 ├── code_navigation_py.py        # Python mixin — delegates to tree-sitter provider
 ├── code_navigation_ts.py        # TS/JS mixin — delegates to tree-sitter provider
-├── code_navigation_tf.py        # Terraform mixin (unchanged, uses regex)
+├── code_navigation_tf.py        # Terraform mixin — delegates to tree-sitter provider
 ├── navigation_provider.py       # Abstract base class (unchanged)
-├── custom_provider.py           # Standalone provider — now uses tree-sitter
-├── terraform_provider.py        # Terraform provider (unchanged)
+├── custom_provider.py           # Standalone provider — uses tree-sitter
+├── terraform_provider.py        # Terraform provider — uses tree-sitter
 ```
 
 ## Components
@@ -39,7 +37,7 @@ Lazy singleton that manages Tree-sitter parsers and languages:
 
 - **Lazy loading**: `tree_sitter` module is imported on first use, not at module level
 - **Caching**: `Language` and `Parser` instances are cached per language
-- **Supported languages**: `python`, `javascript`, `typescript`, `tsx`
+- **Supported languages**: `python`, `javascript`, `typescript`, `tsx`, `hcl`
 - **API**: `parse(source_bytes, lang)`, `query(lang, pattern)`, `run_query(tree, query)`
 
 ### Query Definitions (`tree_sitter_queries.py`)
@@ -60,6 +58,7 @@ Both providers implement the `NavigationProvider` interface:
 
 - **`TreeSitterPyProvider`**: Python symbol finding and import parsing
 - **`TreeSitterTsProvider`**: TypeScript/JavaScript/TSX symbol finding and import parsing
+- **`TreeSitterTfProvider`**: Terraform/HCL block resolution
 
 ## What Tree-sitter Handles vs. What Stays
 
@@ -70,7 +69,7 @@ Both providers implement the `NavigationProvider` interface:
 | Module/file resolution (venv, workspace) | OS path walking (unchanged) |
 | Re-export following (`__init__.py`) | File I/O + tree-sitter |
 | tsconfig path aliases | JSON parsing (unchanged) |
-| Terraform navigation | Regex (unchanged) |
+| Terraform navigation | **Tree-sitter AST queries** |
 
 ## Improvements Over Regex
 
@@ -92,6 +91,7 @@ Added to `pyproject.toml`:
 "tree-sitter-python>=0.23.0",
 "tree-sitter-javascript>=0.23.0",
 "tree-sitter-typescript>=0.23.0",
+"tree-sitter-hcl>=1.2.0",
 ```
 
 ## Startup Performance

@@ -121,22 +121,7 @@ from .log_gateway import LogGateway
 
 ### 4. Symbol Finding: `_find_symbol_in_editor()`
 
-Uses **Tree-sitter AST queries** (with regex fallback) to locate symbol definitions in code. See [Tree-sitter Navigation](2026_03_22_tree_sitter_navigation.md) for details on the AST-based implementation.
-
-| Pattern | Matches |
-|---------|---------|
-| `^class\s+{symbol}\s*[:\(]` | Class definitions |
-| `^\s*def\s+{symbol}\s*\(` | Function/method definitions |
-| `^{symbol}\s*=` | Top-level variable assignments |
-| `^\s+{symbol}\s*=` | Class member assignments |
-
-**Indent Guide Handling:**
-
-The editor displays indent guide characters (`│`) that aren't in the actual file. Before pattern matching, these are stripped:
-
-```python
-content = content.replace("│", " ")
-```
+Uses **Tree-sitter AST queries** to locate symbol definitions in code. See [Tree-sitter Navigation](2026_03_22_tree_sitter_navigation.md) for the full query definitions and architecture. Tree-sitter matches AST node types (function definitions, class definitions, assignments) rather than text patterns, giving accurate results for async functions, type-hinted variables, decorated definitions, and nested classes.
 
 ### 5. Navigation Highlight: `nav_highlight.py`
 
@@ -212,13 +197,16 @@ Returns `False` for Python builtins implemented in C (`str`, `int`, `len`, `prin
 src/
 ├── navigation/
 │   ├── __init__.py
-│   ├── code_navigation.py       # Navigation coordinator
-│   ├── code_navigation_py.py    # Python navigation logic
-│   ├── code_navigation_ts.py    # TypeScript navigation logic
-│   ├── code_navigation_tf.py    # Terraform navigation logic
-│   ├── navigation_provider.py   # Base provider interface
-│   ├── custom_provider.py       # Generic/custom navigation
-│   └── terraform_provider.py    # Terraform-specific provider
+│   ├── code_navigation.py           # Navigation coordinator
+│   ├── code_navigation_py.py        # Python navigation logic (mixin)
+│   ├── code_navigation_ts.py        # TypeScript/JS navigation logic (mixin)
+│   ├── code_navigation_tf.py        # Terraform navigation logic (mixin)
+│   ├── navigation_provider.py       # Base provider interface
+│   ├── tree_sitter_core.py          # Lazy parser manager (language registry, caching)
+│   ├── tree_sitter_queries.py       # S-expression query definitions per language
+│   ├── tree_sitter_py_provider.py   # Python provider using Tree-sitter
+│   ├── tree_sitter_ts_provider.py   # TS/JS provider using Tree-sitter
+│   └── tree_sitter_tf_provider.py   # Terraform provider using Tree-sitter
 ```
 
 ## Critical Behavior: Re-Export Following for Method Calls
@@ -273,4 +261,4 @@ Run: `make tests` to verify this behavior is preserved.
 
 ## Future Improvements
 
-The navigation code has been extracted from the former `language_service.py` into dedicated files under `src/navigation/`. Symbol finding and import parsing now use **Tree-sitter AST queries** (see [Tree-sitter Navigation](2026_03_22_tree_sitter_navigation.md)), with the original regex as a transparent fallback. Further improvements could include LSP integration for cross-language navigation and project-wide symbol indexing.
+The navigation code has been extracted from the former `language_service.py` into dedicated files under `src/navigation/`. Symbol finding and import parsing use **Tree-sitter AST queries** (see [Tree-sitter Navigation](2026_03_22_tree_sitter_navigation.md)). Further improvements could include LSP integration for cross-language navigation and project-wide symbol indexing.

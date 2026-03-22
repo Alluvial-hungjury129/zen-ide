@@ -26,7 +26,7 @@
 |---|------|-------------|
 | 6 | `src/terminal_view.py` | **VTE terminal PTY file descriptors not explicitly closed on tab close.** Relies on GC which may delay, leaking FDs. |
 | 7 | `src/ai/pty_cli_provider.py` | **PTY subprocess not killed on provider switch.** Switching AI providers leaves orphaned child processes. |
-| 8 | ~~`src/navigation/tree_sitter_manager.py`~~ | **Removed.** Tree-sitter was removed from the project. |
+| 8 | ~~`src/navigation/tree_sitter_manager.py`~~ | **Replaced.** Tree-sitter was re-integrated via `tree_sitter_core.py` with lazy loading and caching. |
 
 ### Data Loss Risks
 
@@ -64,7 +64,7 @@
 | 19 | `src/shared/git_manager.py` | **`git status` called synchronously on every tree refresh.** For large repos this blocks the UI for seconds. Cache with TTL or use `inotify`/`FSEvents`. |
 | 20 | `src/editor/autocomplete/autocomplete.py` | **All completions computed eagerly.** Even with 1000+ candidates, all are scored and rendered. Should use virtual list with lazy rendering. |
 | 21 | ~~`src/ai/ai_chat_view.py`~~ | **Removed.** `AIChatView` was deleted. |
-| 22 | ~~`src/navigation/tree_sitter_manager.py`~~ | **Removed.** Tree-sitter was removed from the project. |
+| 22 | ~~`src/navigation/tree_sitter_manager.py`~~ | **Replaced.** Tree-sitter was re-integrated via `tree_sitter_core.py` with lazy loading and caching. |
 
 ### Error Handling
 

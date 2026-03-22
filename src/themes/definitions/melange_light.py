@@ -31,8 +31,6 @@ MELANGE_LIGHT = Theme(
     tree_modified_fg="#BC5C00",
     tree_ignored_fg="#A98A78",
     # Terminal
-    term_bg="#F1F1F1",
-    term_fg="#54433A",
     term_black="#E9E1DB",
     term_red="#C77B8B",
     term_green="#6E9B72",
@@ -46,7 +44,6 @@ MELANGE_LIGHT = Theme(
     border_color="#A98A78",
     border_focus="#BC5C00",
     sash_color="#F1F1F1",
-    # AI / chat
     # Search
     search_match_bg="#CCA478",
     search_current_bg="#A06D00",

@@ -26,8 +26,6 @@ def _make_theme(**overrides):
         tree_fg="#cccccc",
         tree_selected_bg="#37373d",
         tree_modified_fg="#e2c08d",
-        term_bg="#1e1e1e",
-        term_fg="#cccccc",
         accent_color="#007acc",
         border_color="#333333",
         border_focus="#007acc",
@@ -47,7 +45,6 @@ def _make_theme(**overrides):
         syntax_boolean="#569cd6",
         syntax_parameter="#b5cea8",
         sash_color="#3e3e42",
-        term_cyan="#56b6c2",
         search_match_bg="#515c6a",
         search_current_bg="#61afef",
         is_dark=True,
@@ -62,6 +59,7 @@ def _make_theme(**overrides):
         term_yellow="#e5c07b",
         term_blue="#61afef",
         term_magenta="#c678dd",
+        term_cyan="#56b6c2",
         term_white="#abb2bf",
     )
     defaults.update(overrides)

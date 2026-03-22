@@ -31,8 +31,6 @@ MELANGE_DARK = Theme(
     tree_modified_fg="#E49B5D",
     tree_ignored_fg="#867462",
     # Terminal
-    term_bg="#292522",
-    term_fg="#ECE1D7",
     term_black="#34302C",
     term_red="#BD8183",
     term_green="#78997A",

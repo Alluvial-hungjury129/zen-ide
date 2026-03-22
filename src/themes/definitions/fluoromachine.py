@@ -30,8 +30,6 @@ FLUOROMACHINE = Theme(
     tree_modified_fg="#fce566",
     tree_ignored_fg="#544863",
     # Terminal
-    term_bg="#241b2f",
-    term_fg="#8b8da3",
     # Accent - hot magenta
     accent_color="#fc199a",
     # Borders
@@ -39,7 +37,6 @@ FLUOROMACHINE = Theme(
     border_focus="#fc199a",
     sash_color="#2e2240",
     # AI Chat
-    term_cyan="#61e2ff",
     # Syntax - neon retro-futuristic
     syntax_keyword="#fc199a",
     syntax_string="#72f1b8",
@@ -67,6 +64,7 @@ FLUOROMACHINE = Theme(
     term_yellow="#fce566",
     term_blue="#61e2ff",
     term_magenta="#9d7dce",
+    term_cyan="#61e2ff",
     term_white="#8b8da3",
     syntax_parameter="#fce566",
     search_match_bg="#515c6a",

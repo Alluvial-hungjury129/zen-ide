@@ -30,8 +30,6 @@ CYBERDREAM = Theme(
     tree_modified_fg="#f1ff5e",
     tree_ignored_fg="#3c4048",
     # Terminal
-    term_bg="#16181a",
-    term_fg="#ffffff",
     # Accent - electric cyan
     accent_color="#5ef1ff",
     # Borders
@@ -39,7 +37,6 @@ CYBERDREAM = Theme(
     border_focus="#5ef1ff",
     sash_color="#1e2028",
     # AI Chat
-    term_cyan="#5ef1ff",
     # Syntax - vivid neon on black
     syntax_keyword="#ff5ef1",
     syntax_string="#5eff6c",
@@ -67,6 +64,7 @@ CYBERDREAM = Theme(
     term_yellow="#f1ff5e",
     term_blue="#5ea1ff",
     term_magenta="#ff5ef1",
+    term_cyan="#5ef1ff",
     term_white="#ffffff",
     syntax_parameter="#ffbd5e",
     search_match_bg="#515c6a",
