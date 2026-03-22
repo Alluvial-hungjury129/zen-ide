@@ -13,7 +13,7 @@ from shared.ui import ZenButton
 class AITerminalHeader:
     """Header for the AI Terminal panel.
 
-    Builds: [<CLI name> ▾] --- [trash btn] [+ btn] [⛶ btn]
+    Builds: [<CLI name>] --- [trash btn] [+ btn] [⛶ btn]
 
     Attributes exposed:
         box          – the Gtk.Box container
@@ -31,7 +31,7 @@ class AITerminalHeader:
         self.box.set_margin_bottom(TERMINAL_HEADER_MARGIN_BOTTOM)
 
         self.header_btn = ZenButton(
-            label=f"{label} ▾",
+            label=label,
             tooltip="Click to switch AI CLI",
         )
         self.header_btn.set_halign(Gtk.Align.START)
@@ -70,7 +70,7 @@ class AITerminalHeader:
         """Update the CLI name shown in the header button."""
         child = self.header_btn.get_child()
         if child and hasattr(child, "set_text"):
-            child.set_text(f"{label} ▾")
+            child.set_text(label)
 
     def apply_header_font(self) -> None:
         """Apply terminal font to the header button label."""

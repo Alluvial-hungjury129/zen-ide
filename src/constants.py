@@ -106,15 +106,15 @@ TERMINAL_TAB_BAR_MARGIN_BOTTOM = 6  # pixels below terminal tab bar
 
 # Tab Buttons (editor, terminal, AI chat)
 TAB_BUTTON_HEIGHT = 20  # uniform height for all tab buttons across panels
-TAB_BUTTON_FONT_SIZE = 14  # uniform font size (pt) for all tab button labels
+TAB_BUTTON_FONT_SIZE = 12  # uniform font size (pt) for all tab button labels
 
 # ZenButton (shared UI button)
 ZEN_BUTTON_HEIGHT = 25  # uniform height (px) for all ZenButton instances
-ZEN_BUTTON_ICON_SIZE = 14  # default icon font-size (px) for ZenButton icons
+ZEN_BUTTON_ICON_SIZE = 12  # default icon font-size (px) for ZenButton icons
 
 # Panel Header Buttons (AI chat, terminal)
 PANEL_BUTTON_SIZE = ZEN_BUTTON_HEIGHT  # uniform width/height for panel header buttons
-PANEL_HEADER_FONT_SIZE = 14  # uniform font size (pt) for panel header labels
+PANEL_HEADER_FONT_SIZE = 10  # uniform font size (pt) for panel header labels
 
 # Focus Animation
 FOCUS_ANIM_DURATION_MS = 150  # Total animation duration in milliseconds

@@ -321,6 +321,7 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
 
         self._views.append(view)
         tab_idx = len(self._views) - 1
+        self._active_idx = tab_idx
 
         if self._vertical_mode:
             # Vertical mode: show each view's own header, add to vertical container
@@ -341,8 +342,8 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
             self._update_tab_bar_visibility()
             self._content_stack.set_visible_child_name(stack_name)
             self._update_tab_selection()
-
-        self._active_idx = tab_idx
+            GLib.idle_add(self._scroll_tab_into_view, tab_idx)
+            self._header.set_label(self._label_for_view(view))
         return view
 
     def _on_add_request(self) -> None:
