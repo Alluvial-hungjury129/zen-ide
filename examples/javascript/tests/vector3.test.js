@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { Vector3 } from "../vector3.js";
+import { Vector3 } from "../src/vector3.js";
 
 describe("Vector3", () => {
   describe("constructor / getters", () => {

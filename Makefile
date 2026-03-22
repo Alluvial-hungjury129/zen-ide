@@ -29,11 +29,11 @@ help: ## Show this help
 # ── Development ──────────────────────────────────────────────────────
 
 run: ## Run Zen IDE
-	cd src && $(RUN_ENV) $(IDE_CMD)
+	cd src && unset MAKELEVEL MAKEFLAGS && $(RUN_ENV) $(IDE_CMD)
 
 run-compile: ## Run Zen IDE (with bytecode pre-compilation)
 	$(COMPILE)
-	cd src && $(RUN_ENV) $(IDE_CMD)
+	cd src && unset MAKELEVEL MAKEFLAGS && $(RUN_ENV) $(IDE_CMD)
 
 startup-time: ## Measure startup time (opens and closes IDE)
 	@echo "Measuring Zen IDE startup time..."

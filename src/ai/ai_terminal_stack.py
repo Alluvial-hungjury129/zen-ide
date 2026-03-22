@@ -114,6 +114,10 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
                 provider = tab_info.get("provider")
                 if provider:
                     view._current_provider = provider
+                # Restore per-tab model so each tab keeps its model choice
+                model = tab_info.get("model")
+                if model:
+                    view._current_model = model
                 # Restore per-tab session ID so --resume uses the right session
                 session_id = tab_info.get("session_id")
                 if session_id:
@@ -140,6 +144,7 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
         hdr.add_btn.connect("clicked", lambda _b: self._on_add_request())
         hdr.clear_btn.connect("clicked", lambda _b: self._clear_active())
         hdr.maximize_btn.connect("clicked", self._on_maximize_clicked)
+        self._stack_maximize_btn = hdr.maximize_btn
         self._header = hdr
         self.append(hdr.box)
 
@@ -343,11 +348,14 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
     def _on_add_request(self) -> None:
         # Capture the active view's provider before _add_view moves the index.
         prev_provider = self._views[self._active_idx]._current_provider if self._views else None
+        prev_model = self._views[self._active_idx]._current_model if self._views else None
         view = self._add_view()
         # Inherit provider and workspace cwd from the previous active view so
         # the new tab matches the current header selection.
         if prev_provider:
             view._current_provider = prev_provider
+        if prev_model:
+            view._current_model = prev_model
         if self._views and len(self._views) > 1:
             view.cwd = self._views[0].cwd
         view.spawn_shell()
@@ -381,13 +389,14 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
         return _CLI_LABELS.get(view._current_provider or "", "AI")
 
     def _on_header_click(self, _button) -> None:
-        from ai.ai_terminal_view import _find_claude_binary, _find_copilot_binary
+        from ai.ai_terminal_view import _CLAUDE_MODELS, _COPILOT_MODELS, _find_claude_binary, _find_copilot_binary
         from shared.settings import get_setting
 
         claude_bin = _find_claude_binary()
         copilot_bin = _find_copilot_binary()
         active = self._active
         current = (active._current_provider if active else None) or get_setting("ai.provider", "")
+        current_model = (active._current_model if active else None) or get_setting("ai.model", "")
 
         items: list[dict] = []
         if claude_bin:
@@ -399,14 +408,35 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
                 {"label": f"{'✓ ' if current == 'copilot_cli' else '  '}Copilot", "action": "copilot_cli", "enabled": True}
             )
 
+        # Add model submenu for the active provider
+        models = []
+        if current == "claude_cli":
+            models = _CLAUDE_MODELS
+        elif current == "copilot_cli":
+            models = _COPILOT_MODELS
+
+        if models:
+            items.append({"label": "---"})
+            for m in models:
+                check = "✓ " if m == current_model else "  "
+                items.append({"label": f"{check}{m}", "action": f"model:{m}", "enabled": True})
+
         if not items:
             return
+
+        def _on_selected(action: str) -> None:
+            if action.startswith("model:"):
+                model = action[len("model:") :]
+                if active:
+                    active._on_model_selected(model)
+            else:
+                self._on_cli_selected(action)
 
         root = self.get_root()
         if root:
             from popups.nvim_context_menu import show_context_menu
 
-            show_context_menu(root, items, self._on_cli_selected, title="Select AI")
+            show_context_menu(root, items, _on_selected, title="Select AI")
 
     def _on_cli_selected(self, provider: str) -> None:
         from ai.ai_terminal_view import _CLI_LABELS
@@ -552,14 +582,29 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
             self._maximized_view = None
             for v in self._views:
                 v.set_visible(True)
+                v.maximize_btn.remove_css_class("selected")
+                v.maximize_btn.set_tooltip_text("Maximize")
         else:
             # Maximize: hide all except this one
             self._maximized_view = view
             for v in self._views:
-                v.set_visible(v is view)
+                if v is view:
+                    v.set_visible(True)
+                else:
+                    v.set_visible(False)
+                    v.maximize_btn.remove_css_class("selected")
+                    v.maximize_btn.set_tooltip_text("Maximize")
         # Also expand/restore the overall AI chat panel (global maximize)
         if self.on_maximize:
             self.on_maximize("ai_chat")
+
+    @property
+    def maximize_btn(self):
+        """Maximize button (stack-level in tab mode, active view in vertical mode)."""
+        if not self._vertical_mode and hasattr(self, "_stack_maximize_btn"):
+            return self._stack_maximize_btn
+        active = self._active
+        return active.maximize_btn if active else None
 
     @property
     def _is_maximized(self):
@@ -568,6 +613,30 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
     @_is_maximized.setter
     def _is_maximized(self, value):
         self.__is_maximized = value
+        # Sync CSS on per-view maximize buttons
+        for v in self._views:
+            if self._vertical_mode:
+                maximized_view = getattr(self, "_maximized_view", None)
+                if maximized_view and v is maximized_view and value:
+                    v.maximize_btn.add_css_class("selected")
+                    v.maximize_btn.set_tooltip_text("Restore")
+                else:
+                    v.maximize_btn.remove_css_class("selected")
+                    v.maximize_btn.set_tooltip_text("Maximize")
+            else:
+                if value:
+                    v.maximize_btn.add_css_class("selected")
+                    v.maximize_btn.set_tooltip_text("Restore")
+                else:
+                    v.maximize_btn.remove_css_class("selected")
+                    v.maximize_btn.set_tooltip_text("Maximize")
+        if not self._vertical_mode and hasattr(self, "_stack_maximize_btn"):
+            if value:
+                self._stack_maximize_btn.add_css_class("selected")
+                self._stack_maximize_btn.set_tooltip_text("Restore")
+            else:
+                self._stack_maximize_btn.remove_css_class("selected")
+                self._stack_maximize_btn.set_tooltip_text("Maximize")
         if not self._vertical_mode or not self._views:
             return
         if value:
@@ -585,9 +654,14 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
 
     def _update_vertical_focus_border(self):
         """In vertical mode, apply focus border to the active view only."""
+        maximized_view = getattr(self, "_maximized_view", None)
         for view in self._views:
             view.remove_css_class(self.FOCUS_CSS_CLASS)
             view.add_css_class(self.UNFOCUS_CSS_CLASS)
+            if maximized_view and view is maximized_view:
+                view.maximize_btn.add_css_class("selected")
+            elif not maximized_view:
+                view.maximize_btn.remove_css_class("selected")
         if 0 <= self._active_idx < len(self._views):
             active = self._views[self._active_idx]
             active.remove_css_class(self.UNFOCUS_CSS_CLASS)
@@ -782,6 +856,9 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
                 # Persist per-tab provider
                 if view._current_provider:
                     entry["provider"] = view._current_provider
+                # Persist per-tab model
+                if view._current_model:
+                    entry["model"] = view._current_model
                 # Persist per-tab session ID for individual session resume
                 # Validate session exists before saving
                 if hasattr(view, "validate_session_id"):

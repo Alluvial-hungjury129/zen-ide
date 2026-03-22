@@ -1,8 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { Rectangle } from "../rectangle.js";
-import { Color }     from "../shape.js";
-import { Vector3 }   from "../vector3.js";
+import { Rectangle } from "../src/rectangle.js";
+import { Color }     from "../src/shape.js";
+import { Vector3 }   from "../src/vector3.js";
 
 describe("Rectangle", () => {
   describe("defaults", () => {

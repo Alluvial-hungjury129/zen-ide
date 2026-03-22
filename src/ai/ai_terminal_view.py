@@ -13,30 +13,14 @@ import os
 import pathlib
 import re
 import shutil
-import sys
 import time
 from typing import Optional
 
 from gi.repository import GLib, Gtk, Vte
 
-from constants import AI_TERMINAL_SCROLLBAR_HIDE_DELAY_MS
-from shared.settings import get_setting
+from shared.settings import get_setting, set_setting
+from terminal.terminal_jog_wheel import JogWheelScrollbarMixin
 from terminal.terminal_view import TerminalView
-
-# -------------------------------------------------------------------------
-# Virtual scrollbar constants
-# -------------------------------------------------------------------------
-# CLI tools (Claude, Copilot) run in VTE's alternate screen buffer where
-# there is zero scrollback.  Mouse wheel / trackpad scrolling works because
-# VTE forwards mouse events to the CLI via mouse tracking.  The scrollbar
-# cannot reflect VTE scrollback (there is none), so we add a virtual
-# scrollbar that translates drags into SGR mouse-wheel escape sequences
-# fed directly to the CLI.
-# -------------------------------------------------------------------------
-_VSCROLL_RANGE = 10000
-_VSCROLL_PAGE = 1000
-_VSCROLL_BOTTOM = _VSCROLL_RANGE - _VSCROLL_PAGE
-
 
 _CLI_LABELS: dict[str, str] = {
     "claude_cli": "Claude",
@@ -132,7 +116,7 @@ def _write_copilot_instructions(context_block: str) -> None:
         pass
 
 
-class AITerminalView(TerminalView):
+class AITerminalView(JogWheelScrollbarMixin, TerminalView):
     """VTE-based AI terminal that runs claude or copilot CLI interactively.
 
     Inherits all VTE machinery (theme, scroll, shortcuts, font) from
@@ -143,6 +127,7 @@ class AITerminalView(TerminalView):
 
     def __init__(self, config_dir: str | None = None, get_workspace_folders_callback=None, get_editor_context_callback=None):
         self._current_provider: str | None = None
+        self._current_model: str | None = None
         self._input_buf: list[str] = []
         self._title_inferred = False
         self._waiting_for_response = False
@@ -154,8 +139,7 @@ class AITerminalView(TerminalView):
         self._session_id: str | None = None  # Claude CLI session ID for resume
         self._resume_attempted = False  # True while a --resume spawn is settling
         self._resume_spawn_time: float = 0.0
-        self._vscroll_overlay_mode = sys.platform == "darwin"
-        self._vscroll_hide_id: int = 0
+        self._jog_init_fields()
         self.on_title_inferred = None  # callback(title: str)
         self.on_processing_changed = None  # callback(processing: bool)
         self._get_workspace_folders = get_workspace_folders_callback
@@ -180,12 +164,6 @@ class AITerminalView(TerminalView):
         self._ai_header = hdr
         self.append(hdr.box)
 
-        # Layout: overlay the virtual scrollbar on top of the terminal so
-        # revealing it never shifts the content area.
-        overlay = Gtk.Overlay()
-        overlay.set_vexpand(True)
-        overlay.set_hexpand(True)
-
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.NEVER)
         scrolled.set_vexpand(True)
@@ -198,32 +176,7 @@ class AITerminalView(TerminalView):
         self._configure_terminal()
         scrolled.set_child(self.terminal)
 
-        # Virtual scrollbar — translates drags into mouse scroll events
-        # sent to the CLI via feed_child (SGR mouse wheel sequences).
-        self._vscroll_adj = Gtk.Adjustment(
-            value=_VSCROLL_BOTTOM,
-            lower=0,
-            upper=_VSCROLL_RANGE,
-            step_increment=10,
-            page_increment=_VSCROLL_PAGE // 2,
-            page_size=_VSCROLL_PAGE,
-        )
-        self._vscroll_prev = float(_VSCROLL_BOTTOM)
-        self._vscroll_inhibit = False
-        self._vscrollbar = Gtk.Scrollbar(
-            orientation=Gtk.Orientation.VERTICAL,
-            adjustment=self._vscroll_adj,
-        )
-        self._vscrollbar.add_css_class("ai-terminal-scrollbar")
-        self._vscrollbar.set_halign(Gtk.Align.END)
-        self._vscrollbar.set_valign(Gtk.Align.FILL)
-        if self._vscroll_overlay_mode:
-            self._vscrollbar.add_css_class("ai-terminal-scrollbar-overlay")
-            self._vscrollbar.set_visible(False)
-        self._vscroll_adj.connect("value-changed", self._on_vscroll_changed)
-
-        overlay.set_child(scrolled)
-        overlay.add_overlay(self._vscrollbar)
+        overlay = self._jog_create_overlay(scrolled)
         self.append(overlay)
 
         self._commit_handler_id = self.terminal.connect("commit", self._on_vte_commit)
@@ -353,6 +306,18 @@ class AITerminalView(TerminalView):
                 argv.append("--dangerously-skip-permissions")
             elif provider == "copilot_cli":
                 argv.append("--yolo")
+
+        # Model override: use per-tab model, then global setting, then CLI default.
+        # ai.model may be a per-provider dict like {"copilot_cli": "...", "claude_cli": "..."}.
+        model = self._current_model
+        if not model:
+            model_setting = get_setting("ai.model", "")
+            if isinstance(model_setting, dict):
+                model = model_setting.get(provider, "")
+            else:
+                model = model_setting or ""
+        if model:
+            argv.extend(["--model", str(model)])
 
         # Multi-workspace: add extra workspace folders so the CLI can access
         # all repos in the workspace, not just the cwd.
@@ -528,7 +493,24 @@ class AITerminalView(TerminalView):
         if provider == self._current_provider:
             return
         self._current_provider = provider
+        self._current_model = None  # new provider → reset model to default
         self._session_id = None  # new provider → new session
+        self._restart_cli()
+
+    def _on_model_selected(self, model: str) -> None:
+        """Switch this tab's model and restart the terminal."""
+        current = self._current_model
+        if not current:
+            model_setting = get_setting("ai.model", "")
+            if isinstance(model_setting, dict):
+                current = model_setting.get(self._current_provider, "")
+            else:
+                current = model_setting or ""
+        if model == current:
+            return
+        self._current_model = model
+        set_setting("ai.model", model, persist=True)
+        self._session_id = None  # new model → new session
         self._restart_cli()
 
     def _restart_cli(self) -> None:
@@ -729,9 +711,7 @@ class AITerminalView(TerminalView):
                 continue
 
             if ch in ("\r", "\n"):
-                # User submitted — reset virtual scrollbar to bottom
                 self._vscroll_reset()
-
                 user_text = "".join(self._input_buf).strip()
                 # Strip leftover escape sequence fragments (e.g. terminal
                 # capability responses like "[?1;2c" or "[200~").
@@ -817,132 +797,20 @@ class AITerminalView(TerminalView):
             pass
         return True  # keep polling
 
-    # ------------------------------------------------------------------
-    # Virtual scrollbar — translates scrollbar drags into mouse wheel
-    # escape sequences so the CLI scrolls its internal content.
-    # ------------------------------------------------------------------
-
-    def _show_virtual_scrollbar_temporarily(self) -> None:
-        """Reveal the macOS overlay scrollbar briefly after user interaction."""
-        if not self._vscroll_overlay_mode:
-            return
-        self._cancel_virtual_scrollbar_hide()
-        self._vscrollbar.set_visible(True)
-        self._vscroll_hide_id = GLib.timeout_add(
-            AI_TERMINAL_SCROLLBAR_HIDE_DELAY_MS,
-            self._hide_virtual_scrollbar,
-        )
-
-    def _cancel_virtual_scrollbar_hide(self) -> None:
-        """Cancel a pending overlay scrollbar hide callback."""
-        if self._vscroll_hide_id:
-            GLib.source_remove(self._vscroll_hide_id)
-            self._vscroll_hide_id = 0
-
-    def _hide_virtual_scrollbar(self) -> bool:
-        """Hide the macOS overlay scrollbar after the reveal timeout."""
-        self._vscroll_hide_id = 0
-        if self._vscroll_overlay_mode:
-            self._vscrollbar.set_visible(False)
-        return False
-
-    def _hide_virtual_scrollbar_immediately(self) -> None:
-        """Hide the macOS overlay scrollbar without waiting for the timeout."""
-        self._cancel_virtual_scrollbar_hide()
-        if self._vscroll_overlay_mode:
-            self._vscrollbar.set_visible(False)
-
     def _setup_scroll_controller(self) -> None:
-        """AI terminal: observe wheel events to keep the virtual scrollbar in sync.
+        """AI terminal: only observe wheel to show/hide the jog-wheel overlay."""
+        self._jog_setup_scroll_controller()
 
-        The controller runs in BUBBLE phase so VTE processes the event first
-        (forwarding it to the CLI via mouse tracking).  We then nudge the
-        virtual scrollbar position to match, returning False so we never
-        consume the event.
-        """
-        self._scroll_target = None
-        self._scroll_tick_id = 0
-        self._SCROLL_LERP = 0.3
-
-        from gi.repository import Gdk
-
-        flags = Gtk.EventControllerScrollFlags.VERTICAL
-        controller = Gtk.EventControllerScroll.new(flags)
-        controller.set_propagation_phase(Gtk.PropagationPhase.BUBBLE)
-        controller.connect("scroll", self._on_wheel_observe)
-        self.terminal.add_controller(controller)
-        self._wheel_gdk = Gdk
-
-    def _on_wheel_observe(self, controller, _dx, dy) -> bool:
-        """Mirror wheel/touchpad scrolls onto the virtual scrollbar."""
-        adj = getattr(self, "_vscroll_adj", None)
-        if adj is None:
-            return False
-
-        # Determine how many "lines" this event represents
-        dy = float(dy)
-        if dy == 0.0:
-            return False
-
-        self._show_virtual_scrollbar_temporarily()
-
-        get_unit = getattr(controller, "get_unit", None)
-        scroll_unit = getattr(self._wheel_gdk, "ScrollUnit", None)
-        if callable(get_unit) and scroll_unit is not None and get_unit() == scroll_unit.WHEEL:
-            lines = dy * 3  # discrete notch → ~3 lines
-        else:
-            lines = dy  # touchpad continuous delta
-
-        # Move the virtual scrollbar without triggering feed_child
-        self._vscroll_inhibit = True
-        new_val = max(0.0, min(float(adj.get_value()) + lines * 10, _VSCROLL_BOTTOM))
-        adj.set_value(new_val)
-        self._vscroll_prev = new_val
-        self._vscroll_inhibit = False
-        return False  # never consume — VTE still handles the event
-
-    def _on_vscroll_changed(self, adj) -> None:
-        """Translate virtual scrollbar drags into CLI scroll events."""
-        if self._vscroll_inhibit:
-            return
-        self._show_virtual_scrollbar_temporarily()
-        new_val = float(adj.get_value())
-        delta = new_val - self._vscroll_prev
-        self._vscroll_prev = new_val
-
-        if abs(delta) < 1.0:
-            return
-
-        # Convert adjustment delta to scroll lines (10 units ≈ 1 line)
-        lines = int(delta / 10)
-        if lines == 0:
-            return
-
-        # Send SGR mouse-wheel sequences to the CLI.
-        # Button 64 = scroll up, 65 = scroll down (SGR extended mode).
+    def _jog_scroll_lines(self, lines: int) -> None:
+        """Send simulated SGR mouse-wheel events to the CLI."""
         cols = self.terminal.get_column_count()
         rows = self.terminal.get_row_count()
         mid_col = max(1, cols // 2)
         mid_row = max(1, rows // 2)
-
-        button = 65 if lines > 0 else 64
+        button = 65 if lines > 0 else 64  # 65=down, 64=up
         seq = f"\033[<{button};{mid_col};{mid_row}M".encode()
-
-        for _ in range(min(abs(lines), 30)):
+        for _ in range(min(abs(lines), 15)):
             self.terminal.feed_child(seq)
-
-    def _vscroll_reset(self) -> None:
-        """Reset virtual scrollbar to bottom (user is viewing latest content)."""
-        adj = getattr(self, "_vscroll_adj", None)
-        if adj is None:
-            return
-        if abs(adj.get_value() - _VSCROLL_BOTTOM) < 1:
-            return
-        self._vscroll_inhibit = True
-        adj.set_value(_VSCROLL_BOTTOM)
-        self._vscroll_prev = float(_VSCROLL_BOTTOM)
-        self._vscroll_inhibit = False
-        self._hide_virtual_scrollbar_immediately()
 
     def _on_contents_changed(self, _terminal) -> None:
         """Track CLI output for idle detection."""

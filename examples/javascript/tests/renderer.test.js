@@ -1,10 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { Renderer }  from "../renderer.js";
-import { Circle }    from "../circle.js";
-import { Rectangle } from "../rectangle.js";
-import { Color }     from "../shape.js";
-import { Vector3 }   from "../vector3.js";
+import { Renderer }  from "../src/renderer.js";
+import { Circle }    from "../src/circle.js";
+import { Rectangle } from "../src/rectangle.js";
+import { Color }     from "../src/shape.js";
+import { Vector3 }   from "../src/vector3.js";
 
 function makeRenderer() {
   const r = new Renderer();

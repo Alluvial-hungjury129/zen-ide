@@ -88,11 +88,11 @@ class TerminalView(
         scrolled.add_css_class("terminal-scrolled")
         self._scrolled_window = scrolled
 
-        self.append(scrolled)
-
         self.terminal = Vte.Terminal()
         self._configure_terminal()
         scrolled.set_child(self.terminal)
+
+        self.append(scrolled)
 
         self._is_maximized = False
         self.on_maximize = None  # Callback: on_maximize(panel_name)

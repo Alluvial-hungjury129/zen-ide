@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { chunk, fibonacci, flatten, groupBy } from "../utils.js";
+import { chunk, fibonacci, flatten, groupBy } from "../src/utils.js";
 
 describe("fibonacci", () => {
   it("yields first 10 Fibonacci numbers", () => {

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { Color, Shape, colorName, getRegisteredShapes, registerShape } from "../shape.js";
+import { Color, Shape, colorName, getRegisteredShapes, registerShape } from "../src/shape.js";
 
 class ConcreteShape extends Shape {
   constructor(color) { super("Concrete", color); }

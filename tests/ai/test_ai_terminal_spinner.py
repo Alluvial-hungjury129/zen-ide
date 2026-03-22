@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
-from ai.ai_terminal_view import _VSCROLL_BOTTOM, AITerminalView, _strip_escape_fragments
+from ai.ai_terminal_view import AITerminalView, _strip_escape_fragments
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -27,6 +27,13 @@ def _make_view():
     view._in_escape_seq = False
     view._idle_poll_id = 0
     view._last_contents_serial = 0
+    view._vscroll_adj = MagicMock()
+    view._vscroll_adj.get_value.return_value = 100.0
+    view._vscroll_inhibit = False
+    view._vscroll_hide_id = 0
+    view._vscroll_hovering = False
+    view._jog_tick_id = 0
+    view._vscrollbar = MagicMock()
     view.on_processing_changed = MagicMock()
     view.on_title_inferred = None
     view.shell_pid = 42
@@ -313,18 +320,14 @@ class TestIdleDetection:
 
 
 class TestVirtualScrollbarOverlay:
-    def test_show_virtual_scrollbar_temporarily_reveals_and_reschedules_on_macos(self):
+    def test_show_virtual_scrollbar_temporarily_reveals_and_reschedules(self):
         view = _make_view()
-        view._vscroll_overlay_mode = True
         view._vscrollbar = MagicMock()
         view._vscroll_hide_id = 17
 
         with (
-            patch("ai.ai_terminal_view.GLib.source_remove") as mock_remove,
-            patch(
-                "ai.ai_terminal_view.GLib.timeout_add",
-                return_value=23,
-            ) as mock_timeout,
+            patch("terminal.terminal_jog_wheel.GLib.source_remove") as mock_remove,
+            patch("terminal.terminal_jog_wheel.GLib.timeout_add", return_value=23) as mock_timeout,
         ):
             view._show_virtual_scrollbar_temporarily()
 
@@ -333,36 +336,22 @@ class TestVirtualScrollbarOverlay:
         mock_timeout.assert_called_once()
         assert view._vscroll_hide_id == 23
 
-    def test_show_virtual_scrollbar_temporarily_is_noop_off_macos(self):
+    def test_vscroll_reset_hides_scrollbar(self):
         view = _make_view()
-        view._vscroll_overlay_mode = False
-        view._vscrollbar = MagicMock()
-        view._vscroll_hide_id = 0
-
-        with patch("ai.ai_terminal_view.GLib.timeout_add") as mock_timeout:
-            view._show_virtual_scrollbar_temporarily()
-
-        view._vscrollbar.set_visible.assert_not_called()
-        mock_timeout.assert_not_called()
-
-    def test_vscroll_reset_hides_overlay_scrollbar_on_macos(self):
-        view = _make_view()
-        view._vscroll_overlay_mode = True
         view._vscrollbar = MagicMock()
         view._vscroll_hide_id = 31
         view._vscroll_inhibit = False
-        view._vscroll_prev = 120.0
+        view._jog_tick_id = 0
 
         adj = MagicMock()
-        adj.get_value.return_value = 120.0
+        adj.get_value.return_value = 50.0
         view._vscroll_adj = adj
 
-        with patch("ai.ai_terminal_view.GLib.source_remove") as mock_remove:
+        with patch("terminal.terminal_jog_wheel.GLib.source_remove") as mock_remove:
             view._vscroll_reset()
 
         mock_remove.assert_called_once_with(31)
-        adj.set_value.assert_called_once_with(_VSCROLL_BOTTOM)
+        # Jog snaps to center from both _vscroll_reset and _hide_immediately
+        assert adj.set_value.call_count == 2
         view._vscrollbar.set_visible.assert_called_once_with(False)
-        assert view._vscroll_prev == float(_VSCROLL_BOTTOM)
         assert view._vscroll_hide_id == 0
-        view.on_processing_changed.assert_not_called()

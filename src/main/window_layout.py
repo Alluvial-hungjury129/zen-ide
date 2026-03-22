@@ -380,8 +380,8 @@ class WindowLayoutMixin:
             scrollbar slider:hover {{
                 background-color: alpha({theme.fg_color}, 0.4);
             }}
-            .ai-terminal-scrollbar,
-            .ai-terminal-scrollbar trough {{
+            .terminal-scrollbar,
+            .terminal-scrollbar trough {{
                 background-color: transparent;
                 background-image: none;
                 border: none;
