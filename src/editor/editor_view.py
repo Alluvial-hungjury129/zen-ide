@@ -751,13 +751,12 @@ class EditorTab:
         self.buffer = GtkSource.Buffer()
         self.view = ZenSourceView(buffer=self.buffer)
 
-        # Git diff gutter renderer (vertical bars drawn in do_snapshot)
+        # Git diff gutter renderer (vertical bars drawn in do_snapshot).
+        # File path is set later in load_file() to avoid duplicate git fetches.
         from .gutter_diff_renderer import GutterDiffRenderer
 
         self._gutter_diff = GutterDiffRenderer(self.view)
         self.view._gutter_diff_renderer = self._gutter_diff
-        if file_path:
-            self._gutter_diff.set_file_path(file_path)
 
         # Inline color preview swatches (colored squares next to hex colors)
         self._color_preview = ColorPreviewRenderer(self.view)
@@ -772,10 +771,9 @@ class EditorTab:
         # Configure view
         self._configure_view()
 
-        # Apply theme and language
+        # Apply theme (language is set later in load_file to avoid
+        # duplicate work — __init__ has no buffer content yet).
         self._apply_theme()
-        if file_path:
-            self._set_language_from_file(file_path)
 
         # Semantic call-site highlighting (class usage + function calls)
         setup_semantic_highlight(self, get_theme())
@@ -785,10 +783,8 @@ class EditorTab:
 
         setup_buffer_cache(self)
 
-        # Autocomplete (Ctrl+Space)
-        from .autocomplete import Autocomplete
-
-        self._autocomplete = Autocomplete(self)
+        # Autocomplete (Ctrl+Space) — lazy init on first use
+        self._autocomplete = None
 
         # Inline AI suggestions (ghost text) — lazy init on first keypress
         self._inline_completion = None
@@ -817,11 +813,21 @@ class EditorTab:
             pass
         return self._inline_completion
 
+    def _ensure_autocomplete(self):
+        """Lazily initialise the autocomplete manager."""
+        if self._autocomplete is not None:
+            return self._autocomplete
+        from .autocomplete import Autocomplete
+
+        self._autocomplete = Autocomplete(self)
+        return self._autocomplete
+
     def _configure_view(self):
         """Configure the source view settings."""
         view = self.view
 
-        # Basic settings
+        # Batch property changes to avoid per-setter layout invalidation
+        view.freeze_notify()
         view.set_show_line_numbers(True)
         view.set_highlight_current_line(True)
         view.set_auto_indent(True)
@@ -831,12 +837,11 @@ class EditorTab:
         view.set_smart_backspace(True)
         view.set_monospace(True)
         view.set_left_margin(EDITOR_LEFT_PADDING)
+        view.set_indent_width(DEFAULT_INDENT_WIDTH)
+        view.thaw_notify()
 
         # Bracket matching
         self.buffer.set_highlight_matching_brackets(True)
-
-        # Indent width (used by auto-indent)
-        view.set_indent_width(DEFAULT_INDENT_WIDTH)
 
         # SpaceDrawer: dots for leading whitespace (indent visualization)
         space_drawer = view.get_space_drawer()
@@ -1039,17 +1044,18 @@ class EditorTab:
             self._ensure_inline_completion()
 
         # Autocomplete: delegate keys when popup is visible
-        if self._autocomplete.is_visible():
-            if self._autocomplete.handle_key(keyval, state):
+        ac = self._ensure_autocomplete()
+        if ac.is_visible():
+            if ac.handle_key(keyval, state):
                 return True
 
         # Tab to navigate autocomplete parameter tab stops
-        if keyval == Gdk.KEY_Tab and self._autocomplete.has_active_tab_stops():
-            return self._autocomplete.advance_tab_stop()
+        if keyval == Gdk.KEY_Tab and ac.has_active_tab_stops():
+            return ac.advance_tab_stop()
 
         # Escape clears active tab stops
-        if keyval == Gdk.KEY_Escape and self._autocomplete.has_active_tab_stops():
-            self._autocomplete.clear_tab_stops()
+        if keyval == Gdk.KEY_Escape and ac.has_active_tab_stops():
+            ac.clear_tab_stops()
             return True
 
         # Ctrl+Space or Cmd+Space triggers autocomplete
@@ -1063,7 +1069,7 @@ class EditorTab:
             and not is_shift
             and not is_alt
         ):
-            self._autocomplete.show(force=True)
+            self._ensure_autocomplete().show(force=True)
             return True
 
         # Alt+\ triggers inline AI completion manually

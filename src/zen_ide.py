@@ -596,8 +596,7 @@ class ZenIDEApp(Gtk.Application):
     def __init__(self):
         super().__init__(
             application_id="com.zenide.app",
-            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE
-            | Gio.ApplicationFlags.HANDLES_OPEN,
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE | Gio.ApplicationFlags.HANDLES_OPEN,
         )
         self._pending_workspace = None
         self._pending_file = None

@@ -189,17 +189,19 @@ class WindowEventsMixin:
         return False
 
     def _on_tab_closed(self):
-        """Persist open files to settings after a tab is closed."""
+        """Persist open files to settings after a tab is closed.
+
+        Uses GLib.idle_add to avoid blocking the UI with synchronous disk I/O.
+        """
+        from gi.repository import GLib
+
         from shared.settings import save_workspace
 
-        open_files = []
-        for tab in self.editor_view.tabs.values():
-            if tab.file_path:
-                open_files.append(tab.file_path)
+        open_files = [tab.file_path for tab in self.editor_view.tabs.values() if tab.file_path]
         last_file = self.editor_view.get_current_file_path()
-        save_workspace(open_files=open_files, last_file=last_file)
+        GLib.idle_add(lambda: save_workspace(open_files=open_files, last_file=last_file) or False)
 
-        # Update IDE state file for AI context
+        # Update IDE state file for AI context (debounced + threaded)
         self._update_ide_state_file()
 
     def _on_tabs_empty(self):

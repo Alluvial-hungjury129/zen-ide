@@ -31,9 +31,6 @@ class ColorPreviewRenderer:
         if buf:
             self._buffer_changed_id = buf.connect("changed", self._on_buffer_changed)
 
-        # Initial scan
-        GLib.idle_add(lambda: self._scan_colors() or False)
-
     def _on_buffer_changed(self, buffer):
         """Debounced handler for buffer changes."""
         if self._update_timeout_id:

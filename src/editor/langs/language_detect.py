@@ -67,6 +67,9 @@ _EXT_TO_LANG = {
 }
 
 
+_detect_cache: dict[str, GtkSource.Language | None] = {}
+
+
 def detect_language(file_path: str) -> GtkSource.Language | None:
     """Detect the GtkSourceView language for a file path.
 
@@ -74,30 +77,43 @@ def detect_language(file_path: str) -> GtkSource.Language | None:
     1. content_type + guess_language
     2. Filename-based lookup (Makefile, Dockerfile, etc.)
     3. Extension-based lookup
+
+    Results are cached by (basename, extension) to avoid repeated
+    Gio.content_type_guess calls (~5 ms each).
     """
+    basename = os.path.basename(file_path)
+    ext = os.path.splitext(file_path)[1].lower()
+    cache_key = f"{basename}\0{ext}"
+
+    cached = _detect_cache.get(cache_key)
+    if cached is not None:
+        return cached if cached else None  # False sentinel → None
+
     lang_manager = GtkSource.LanguageManager.get_default()
 
-    # Try with content type first
-    content_type, _ = Gio.content_type_guess(file_path, None)
-    if content_type:
-        language = lang_manager.guess_language(file_path, content_type)
-        if language:
-            return language
-
-    # Fallback: match by filename
-    basename = os.path.basename(file_path)
-    lang_id = _NAME_TO_LANG.get(basename)
-    if lang_id:
-        language = lang_manager.get_language(lang_id)
-        if language:
-            return language
-
-    # Fallback: match by extension
-    ext = os.path.splitext(file_path)[1].lower()
+    # Fast path: extension-based lookup (avoids expensive Gio.content_type_guess)
     lang_id = _EXT_TO_LANG.get(ext)
     if lang_id:
         language = lang_manager.get_language(lang_id)
         if language:
+            _detect_cache[cache_key] = language
             return language
 
+    # Fallback: match by filename (Makefile, Dockerfile, etc.)
+    lang_id = _NAME_TO_LANG.get(basename)
+    if lang_id:
+        language = lang_manager.get_language(lang_id)
+        if language:
+            _detect_cache[cache_key] = language
+            return language
+
+    # Fallback: content type guess (slow — ~5ms on macOS)
+    content_type, _ = Gio.content_type_guess(file_path, None)
+    if content_type:
+        language = lang_manager.guess_language(file_path, content_type)
+        if language:
+            _detect_cache[cache_key] = language
+            return language
+
+    _detect_cache[cache_key] = False  # sentinel for "no language"
     return None

@@ -86,24 +86,28 @@ def setup_semantic_highlight(tab, theme):
         if tag:
             tag.set_priority(max_prio)
 
-    # Debounced re-highlight on text changes.
-    # Uses timeout_add (150ms) instead of idle_add to avoid blocking the
-    # main loop during rapid typing/scrolling — gives GTK time to
-    # process rendering frames between edits.
-    state = {"pending_id": 0, "idle_id": 0}
+    # Debounced re-highlight on text changes and scroll.
+    # Runs at LOW priority so GTK rendering is never blocked.
+    state = {"pending_id": 0}
 
     def _schedule_highlight(*_args):
-        # Cancel any pending idle or timeout to avoid redundant runs
-        if state["idle_id"]:
-            GLib.source_remove(state["idle_id"])
-            state["idle_id"] = 0
         if state["pending_id"]:
             GLib.source_remove(state["pending_id"])
-        state["pending_id"] = GLib.timeout_add(150, _do_highlight)
+        state["pending_id"] = GLib.timeout_add(150, _enqueue_highlight)
+
+    def _schedule_scroll_highlight(*_args):
+        """Re-highlight on scroll so newly visible lines get tags."""
+        if state["pending_id"]:
+            GLib.source_remove(state["pending_id"])
+        state["pending_id"] = GLib.timeout_add(100, _enqueue_highlight)
+
+    def _enqueue_highlight():
+        """After debounce, schedule actual work at low priority."""
+        state["pending_id"] = 0
+        GLib.idle_add(_do_highlight, priority=GLib.PRIORITY_LOW)
+        return GLib.SOURCE_REMOVE
 
     def _do_highlight():
-        state["pending_id"] = 0
-        state["idle_id"] = 0
         _apply_semantic_tags(buf, tab)
         return GLib.SOURCE_REMOVE
 
@@ -111,9 +115,11 @@ def setup_semantic_highlight(tab, theme):
     if not getattr(tab, "_semantic_handler_id", None):
         hid = buf.connect("changed", _schedule_highlight)
         tab._semantic_handler_id = hid
-
-    # Initial highlight
-    state["idle_id"] = GLib.idle_add(_do_highlight)
+        # Re-highlight when viewport scrolls to cover newly visible lines
+        view = tab.view
+        vadj = view.get_vadjustment()
+        if vadj:
+            vadj.connect("value-changed", _schedule_scroll_highlight)
 
 
 def update_semantic_colors(tab, theme):
@@ -143,7 +149,11 @@ def update_semantic_colors(tab, theme):
 
 
 def _apply_semantic_tags(buf, tab=None):
-    """Apply semantic highlighting tags to the entire buffer via tree-sitter."""
+    """Apply semantic highlighting tags to the visible range via tree-sitter.
+
+    Only highlights lines visible in the viewport (plus a margin) to keep
+    main-thread cost proportional to screen size, not file size.
+    """
     lang = buf.get_language()
     if not lang:
         return
@@ -166,13 +176,43 @@ def _apply_semantic_tags(buf, tab=None):
     if not ts_lang:
         return
 
+    # Full buffer text needed for tree-sitter parse (cached/incremental).
     start = buf.get_start_iter()
     end = buf.get_end_iter()
     text = buf.get_text(start, end, True)
 
-    # Remove existing semantic tags.
+    # Determine visible line range (fall back to full buffer if no view).
+    view = getattr(tab, "view", None)
+    if view and view.get_mapped():
+        visible_rect = view.get_visible_rect()
+        top_iter = view.get_iter_at_location(visible_rect.x, visible_rect.y)
+        bot_iter = view.get_iter_at_location(visible_rect.x, visible_rect.y + visible_rect.height)
+        # Handle (bool, iter) tuple return variant
+        top_line = (top_iter[1] if isinstance(top_iter, tuple) else top_iter).get_line()
+        bot_line = (bot_iter[1] if isinstance(bot_iter, tuple) else bot_iter).get_line()
+        margin = max((bot_line - top_line), 40)
+        vis_start_line = max(0, top_line - margin)
+        vis_end_line = bot_line + margin
+    else:
+        # View not mapped yet — limit to first screenful (~80 lines)
+        vis_start_line = 0
+        vis_end_line = 80
+
+    # Compute byte offsets for the visible range.
+    vis_start_iter = buf.get_iter_at_line(vis_start_line)
+    vis_end_iter = buf.get_iter_at_line(vis_end_line)
+    if isinstance(vis_start_iter, tuple):
+        vis_start_iter = vis_start_iter[1]
+    if isinstance(vis_end_iter, tuple):
+        vis_end_iter = vis_end_iter[1]
+    if not vis_end_iter.ends_line():
+        vis_end_iter.forward_to_line_end()
+    vis_start_char = vis_start_iter.get_offset()
+    vis_end_char = vis_end_iter.get_offset()
+
+    # Remove existing semantic tags only in the visible range.
     for tag_name in (TAG_CLASS_USAGE, TAG_FUNC_CALL, TAG_PARAM, TAG_SELF, TAG_PROPERTY):
-        buf.remove_tag_by_name(tag_name, buf.get_start_iter(), buf.get_end_iter())
+        buf.remove_tag_by_name(tag_name, vis_start_iter, vis_end_iter)
 
     tag_table = buf.get_tag_table()
     class_tag = tag_table.lookup(TAG_CLASS_USAGE)
@@ -187,7 +227,28 @@ def _apply_semantic_tags(buf, tab=None):
     if tree is None:
         return
 
-    tokens = extract_semantic_tokens(tree.root_node, ts_lang)
+    # Compute visible byte range for AST pruning.
+    # For pure ASCII, byte offsets equal char offsets.
+    text_bytes = text.encode("utf-8")
+    need_mapping = len(text) != len(text_bytes)
+    if need_mapping:
+        # Build full byte map — needed for tag application anyway
+        byte_to_char = _build_byte_to_char_map(text)
+        # Invert to get char→byte for visible range boundaries
+        char_to_byte = {v: k for k, v in byte_to_char.items()}
+        vis_start_byte = char_to_byte.get(vis_start_char, 0)
+        vis_end_byte = char_to_byte.get(vis_end_char, len(text_bytes))
+    else:
+        byte_to_char = None
+        vis_start_byte = vis_start_char
+        vis_end_byte = vis_end_char
+
+    tokens = extract_semantic_tokens(
+        tree.root_node,
+        ts_lang,
+        vis_start_byte=vis_start_byte,
+        vis_end_byte=vis_end_byte,
+    )
 
     tag_map = {
         "class": class_tag,
@@ -197,26 +258,20 @@ def _apply_semantic_tags(buf, tab=None):
         "property": prop_tag,
     }
 
-    # Byte → char offset conversion.  For pure ASCII, offsets are identical.
-    text_bytes = text.encode("utf-8")
-    need_mapping = len(text) != len(text_bytes)
-
+    # Apply tags — tokens are already range-pruned by extract_semantic_tokens.
     if need_mapping:
-        byte_to_char = _build_byte_to_char_map(text)
         for start_byte, end_byte, token_type in tokens:
-            tag = tag_map.get(token_type)
-            if tag is None:
-                continue
             s = byte_to_char.get(start_byte)
             e = byte_to_char.get(end_byte)
             if s is not None and e is not None:
-                _apply_tag_at_offsets(buf, tag, s, e)
+                tag = tag_map.get(token_type)
+                if tag is not None:
+                    _apply_tag_at_offsets(buf, tag, s, e)
     else:
         for start_byte, end_byte, token_type in tokens:
             tag = tag_map.get(token_type)
-            if tag is None:
-                continue
-            _apply_tag_at_offsets(buf, tag, start_byte, end_byte)
+            if tag is not None:
+                _apply_tag_at_offsets(buf, tag, start_byte, end_byte)
 
 
 def _build_byte_to_char_map(text: str) -> dict:

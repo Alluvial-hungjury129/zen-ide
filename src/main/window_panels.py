@@ -206,11 +206,14 @@ class WindowPanelsMixin:
 
         window_height = self.get_height()
         # Collapse editor if no tabs are open (only if auto_expand_terminals is enabled)
+        # but keep editor visible when welcome screen or dev pad is showing
         from shared.settings.settings_manager import get_setting
 
         if (
             hasattr(self, "editor_view")
             and not self.editor_view.tabs
+            and not self._has_welcome_screen()
+            and not self._has_dev_pad_tab()
             and get_setting("behavior.auto_expand_terminals", True)
         ):
             animate_paned(self.right_paned, 0, on_done=self._sync_terminal_resize)

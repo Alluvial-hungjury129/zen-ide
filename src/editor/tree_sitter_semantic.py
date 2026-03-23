@@ -387,8 +387,16 @@ _TS_FUNC_TYPES = frozenset(
 )
 
 
-def _walk(node, tokens, param_scope, lang_type, classify_fn, func_types, get_params_fn):
-    """Recursive walk that tracks parameter scope."""
+def _walk(node, tokens, param_scope, lang_type, classify_fn, func_types, get_params_fn, vis_start_byte=0, vis_end_byte=0):
+    """Recursive walk that tracks parameter scope.
+
+    When *vis_end_byte* > 0, prunes branches entirely outside the visible
+    byte range for faster highlighting on large files.
+    """
+    # Prune nodes entirely outside the visible range.
+    if vis_end_byte and (node.end_byte < vis_start_byte or node.start_byte > vis_end_byte):
+        return
+
     new_scope = param_scope
 
     if node.type in func_types:
@@ -399,7 +407,7 @@ def _walk(node, tokens, param_scope, lang_type, classify_fn, func_types, get_par
     classify_fn(node, tokens, new_scope)
 
     for child in node.children:
-        _walk(child, tokens, new_scope, lang_type, classify_fn, func_types, get_params_fn)
+        _walk(child, tokens, new_scope, lang_type, classify_fn, func_types, get_params_fn, vis_start_byte, vis_end_byte)
 
 
 # ---------------------------------------------------------------------------
@@ -407,11 +415,14 @@ def _walk(node, tokens, param_scope, lang_type, classify_fn, func_types, get_par
 # ---------------------------------------------------------------------------
 
 
-def extract_semantic_tokens(root_node, lang_type: str):
+def extract_semantic_tokens(root_node, lang_type: str, vis_start_byte: int = 0, vis_end_byte: int = 0):
     """Extract semantic tokens from a tree-sitter root node.
 
     *lang_type* is a tree-sitter language name: ``"python"``,
     ``"javascript"``, ``"typescript"``, or ``"tsx"``.
+
+    When *vis_end_byte* > 0, only tokens overlapping the given byte range
+    are extracted (tree branches outside the range are pruned).
 
     Returns a list of ``(start_byte, end_byte, token_type)`` tuples.
     """
@@ -427,5 +438,5 @@ def extract_semantic_tokens(root_node, lang_type: str):
         ft = _TS_FUNC_TYPES
         gp = _get_ts_params if track_params else lambda _: frozenset()
 
-    _walk(root_node, tokens, frozenset(), lang_type, fn, ft, gp)
+    _walk(root_node, tokens, frozenset(), lang_type, fn, ft, gp, vis_start_byte, vis_end_byte)
     return tokens

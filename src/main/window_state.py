@@ -152,7 +152,8 @@ class WindowStateMixin:
             return
         self.main_paned.set_position(saved["main"])
         # Respect editor collapse — don't restore right position if editor is collapsed
-        if getattr(self, "_editor_collapsed", False):
+        # Also keep editor visible when welcome screen or dev pad is showing
+        if getattr(self, "_editor_collapsed", False) and not self._has_welcome_screen() and not self._has_dev_pad_tab():
             self.right_paned.set_position(0)
         else:
             self.right_paned.set_position(saved["right"])
@@ -643,11 +644,107 @@ class WindowStateMixin:
         }
 
     def _update_ide_state_file(self) -> None:
-        """Write the current editor context to ``~/.zen_ide/ide_state.json``."""
+        """Debounced update of ``~/.zen_ide/ide_state.json``.
+
+        Git queries run in a background thread to avoid blocking the UI.
+        Multiple calls within 200 ms are coalesced into a single write.
+        """
+        debouncer = getattr(self, "_ide_state_debouncer", None)
+        if debouncer is None:
+            from shared.debounce import Debouncer
+
+            debouncer = Debouncer(200, self._do_update_ide_state)
+            self._ide_state_debouncer = debouncer
+        debouncer()
+
+    def _do_update_ide_state(self) -> None:
+        """Actually collect context and write ide_state.json in a thread."""
+
+        import threading
+
         from shared.ide_state_writer import write_ide_state
 
-        ctx = self._get_editor_context()
-        write_ide_state(**ctx)
+        ctx = self._get_editor_context_fast()
+
+        def _bg():
+            # Expensive git queries happen off the main thread.
+            git_branch, git_branches = self._collect_git_branches()
+            ctx["git_branch"] = git_branch
+            ctx["git_branches"] = git_branches
+            write_ide_state(**ctx)
+
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _get_editor_context_fast(self) -> dict:
+        """Collect editor context *without* git queries (main-thread safe)."""
+        active_file = ""
+        open_files: list[str] = []
+        workspace_folders: list[str] = []
+        workspace_file = ""
+
+        try:
+            active_file = self.editor_view.get_current_file_path() or ""
+        except Exception:
+            pass
+        try:
+            for tab in self.editor_view.tabs.values():
+                if tab.file_path:
+                    open_files.append(tab.file_path)
+        except Exception:
+            pass
+        try:
+            workspace_folders = list(self.tree_view.get_workspace_folders() or [])
+        except Exception:
+            pass
+        try:
+            from shared.settings import get_setting
+
+            workspace_file = get_setting("workspace.workspace_file", "") or ""
+        except Exception:
+            pass
+
+        return {
+            "active_file": active_file,
+            "open_files": open_files,
+            "workspace_folders": workspace_folders,
+            "workspace_file": workspace_file,
+            "git_branch": "",
+            "git_branches": {},
+        }
+
+    def _collect_git_branches(self) -> tuple[str, dict[str, str]]:
+        """Collect git branch info for all workspace repos (thread-safe)."""
+        git_branch = ""
+        git_branches: dict[str, str] = {}
+        try:
+            from shared.git_manager import get_git_manager
+
+            git = get_git_manager()
+            workspace_folders = list(self.tree_view.get_workspace_folders() or [])
+            active_file = ""
+            try:
+                active_file = self.editor_view.get_current_file_path() or ""
+            except Exception:
+                pass
+
+            seen_roots: set[str] = set()
+            targets = list(workspace_folders)
+            if active_file:
+                targets.insert(0, active_file)
+            for target in targets:
+                repo_root = git.get_repo_root(target)
+                if repo_root and repo_root not in seen_roots:
+                    seen_roots.add(repo_root)
+                    branch = git.get_current_branch(repo_root) or ""
+                    if branch:
+                        git_branches[os.path.basename(repo_root)] = branch
+
+            target = active_file or (workspace_folders[0] if workspace_folders else "")
+            if target:
+                git_branch = git.get_current_branch(target) or ""
+        except Exception:
+            pass
+        return git_branch, git_branches
 
     def _deferred_background_init(self):
         """Background init: git status, file watcher, diagnostics — non-visible."""
