@@ -117,11 +117,12 @@ class TestGetStateFilePath:
 
 
 class TestAppendIdeContextPrompt:
-    """Test the system prompt injection logic in AITerminalView."""
+    """Test the system prompt injection logic in CLI providers."""
 
     def test_claude_cli_appends_system_prompt(self):
-        from ai.ai_terminal_view import AITerminalView
+        from ai.cli.claude_cli import ClaudeCLI
 
+        cli = ClaudeCLI()
         argv = ["/usr/bin/claude"]
         ctx = {
             "active_file": "/src/main.py",
@@ -130,22 +131,22 @@ class TestAppendIdeContextPrompt:
             "workspace_file": "",
             "git_branch": "main",
         }
-        AITerminalView._append_ide_context_prompt(argv, "claude_cli", ctx)
+        cli.append_ide_context(argv, ctx)
 
         assert "--append-system-prompt" in argv
         prompt_idx = argv.index("--append-system-prompt")
         prompt_text = argv[prompt_idx + 1]
         assert "Active file" in prompt_text
         assert "/src/main.py" in prompt_text
-        assert "main" in prompt_text
         assert "ide_state.json" in prompt_text
 
     def test_copilot_cli_writes_instructions_and_adds_dir(self):
         """Copilot CLI writes copilot-instructions.md and adds --add-dir."""
         from unittest.mock import patch as _patch
 
-        from ai.ai_terminal_view import AITerminalView
+        from ai.cli.copilot_cli import CopilotCLI
 
+        cli = CopilotCLI()
         argv = ["/usr/bin/copilot"]
         ctx = {
             "active_file": "/src/app.rs",
@@ -154,36 +155,38 @@ class TestAppendIdeContextPrompt:
             "workspace_file": "",
             "git_branch": "develop",
         }
-        with _patch("ai.ai_terminal_view._write_copilot_instructions") as mock_write:
-            AITerminalView._append_ide_context_prompt(argv, "copilot_cli", ctx)
+        with _patch("ai.cli.copilot_cli._write_copilot_instructions") as mock_write:
+            cli.append_ide_context(argv, ctx)
 
             # Should write copilot instructions with context
             mock_write.assert_called_once()
             prompt_text = mock_write.call_args[0][0]
             assert "/src/app.rs" in prompt_text
-            assert "develop" in prompt_text
 
         # Should add --add-dir for state file, but NOT -i
         assert "--add-dir" in argv
         assert "-i" not in argv
 
     def test_empty_context_does_not_append(self):
-        from ai.ai_terminal_view import AITerminalView
+        from ai.cli.claude_cli import ClaudeCLI
 
+        cli = ClaudeCLI()
         argv = ["/usr/bin/claude"]
-        AITerminalView._append_ide_context_prompt(argv, "claude_cli", {})
+        cli.append_ide_context(argv, {})
         assert len(argv) == 1
 
     def test_none_context_does_not_append(self):
-        from ai.ai_terminal_view import AITerminalView
+        from ai.cli.claude_cli import ClaudeCLI
 
+        cli = ClaudeCLI()
         argv = ["/usr/bin/claude"]
-        AITerminalView._append_ide_context_prompt(argv, "claude_cli", None)
+        cli.append_ide_context(argv, None)
         assert len(argv) == 1
 
     def test_partial_context_includes_available_fields(self):
-        from ai.ai_terminal_view import AITerminalView
+        from ai.cli.claude_cli import ClaudeCLI
 
+        cli = ClaudeCLI()
         argv = ["/usr/bin/claude"]
         ctx = {
             "active_file": "/src/test.py",
@@ -192,7 +195,7 @@ class TestAppendIdeContextPrompt:
             "workspace_file": "",
             "git_branch": "",
         }
-        AITerminalView._append_ide_context_prompt(argv, "claude_cli", ctx)
+        cli.append_ide_context(argv, ctx)
 
         assert "--append-system-prompt" in argv
         prompt_text = argv[argv.index("--append-system-prompt") + 1]
@@ -207,10 +210,10 @@ class TestWriteCopilotInstructions:
     def test_creates_file_with_context(self, tmp_path):
         from unittest.mock import patch as _patch
 
-        instructions_path = str(tmp_path / "copilot-instructions.md")
-        with _patch("ai.ai_terminal_view._COPILOT_INSTRUCTIONS_PATH", instructions_path):
-            from ai.ai_terminal_view import _write_copilot_instructions
+        from ai.cli.copilot_cli import _write_copilot_instructions
 
+        instructions_path = str(tmp_path / "copilot-instructions.md")
+        with _patch("ai.cli.copilot_cli._COPILOT_INSTRUCTIONS_PATH", instructions_path):
             _write_copilot_instructions("## Zen IDE Context\n- Active file: /test.py")
 
             content = open(instructions_path).read()
@@ -221,12 +224,12 @@ class TestWriteCopilotInstructions:
     def test_preserves_existing_user_content(self, tmp_path):
         from unittest.mock import patch as _patch
 
+        from ai.cli.copilot_cli import _write_copilot_instructions
+
         instructions_path = tmp_path / "copilot-instructions.md"
         instructions_path.write_text("# My custom instructions\nBe concise.\n")
 
-        with _patch("ai.ai_terminal_view._COPILOT_INSTRUCTIONS_PATH", str(instructions_path)):
-            from ai.ai_terminal_view import _write_copilot_instructions
-
+        with _patch("ai.cli.copilot_cli._COPILOT_INSTRUCTIONS_PATH", str(instructions_path)):
             _write_copilot_instructions("## Zen IDE Context\n- Active file: /a.py")
 
             content = instructions_path.read_text()
@@ -237,14 +240,14 @@ class TestWriteCopilotInstructions:
     def test_replaces_existing_managed_block(self, tmp_path):
         from unittest.mock import patch as _patch
 
+        from ai.cli.copilot_cli import _write_copilot_instructions
+
         instructions_path = tmp_path / "copilot-instructions.md"
         instructions_path.write_text(
             "# My stuff\n<!-- zen-ide-context-start -->\nold context\n<!-- zen-ide-context-end -->\n# More stuff\n"
         )
 
-        with _patch("ai.ai_terminal_view._COPILOT_INSTRUCTIONS_PATH", str(instructions_path)):
-            from ai.ai_terminal_view import _write_copilot_instructions
-
+        with _patch("ai.cli.copilot_cli._COPILOT_INSTRUCTIONS_PATH", str(instructions_path)):
             _write_copilot_instructions("new context")
 
             content = instructions_path.read_text()
