@@ -425,6 +425,7 @@ class DiffView(FocusBorderMixin, Gtk.Box):
         self.left_view = ZenSourceView(buffer=self.left_buffer)
         self._configure_view(self.left_view)
         self.left_view.set_editable(False)
+        self.left_view.connect("copy-clipboard", self._on_copy_to_system)
         self._left_scroll.set_child(self.left_view)
         left_box.append(self._left_scroll)
 
@@ -451,6 +452,7 @@ class DiffView(FocusBorderMixin, Gtk.Box):
         self.right_view = ZenSourceView(buffer=self.right_buffer)
         self._configure_view(self.right_view)
         self.right_view.set_editable(False)
+        self.right_view.connect("copy-clipboard", self._on_copy_to_system)
         self._right_scroll.set_child(self.right_view)
 
         # Add revert gutter to right view (for additions/changes)
@@ -603,6 +605,16 @@ class DiffView(FocusBorderMixin, Gtk.Box):
         header.append(hint)
 
         return header
+
+    def _on_copy_to_system(self, textview):
+        """Write selected text to the OS clipboard so it survives app exit."""
+        buf = textview.get_buffer()
+        bounds = buf.get_selection_bounds()
+        if bounds:
+            from shared.utils import copy_to_system_clipboard
+
+            text = buf.get_text(bounds[0], bounds[1], True)
+            copy_to_system_clipboard(text)
 
     def _on_key_pressed(self, controller, keyval, keycode, state):
         """Handle key press events."""
@@ -813,7 +825,11 @@ class DiffView(FocusBorderMixin, Gtk.Box):
             self._find_count_label.set_label(f"left: {left_count}")
 
     def _on_diff_clicked(self, gesture, n_press, x, y):
-        """Handle click anywhere on diff view - grab focus for keyboard events."""
+        """Handle click anywhere on diff view - grab focus for keyboard events.
+        Skip if a child source view already has focus (preserves text selection for copy)."""
+        focused = self.get_root().get_focus() if self.get_root() else None
+        if focused in (self.left_view, self.right_view):
+            return
         self.grab_focus()
 
     def _on_view_clicked(self, gesture, n_press, x, y):
