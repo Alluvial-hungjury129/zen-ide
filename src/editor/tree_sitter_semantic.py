@@ -159,6 +159,8 @@ def _classify_python(node, tokens, param_scope):
     if node.type != "identifier":
         return
 
+    if node.text is None:
+        return
     name = node.text.decode("utf-8")
     parent = node.parent
     if parent is None:
@@ -287,6 +289,8 @@ def _classify_ts(node, tokens, param_scope):
     if ntype not in ("identifier", "property_identifier", "type_identifier"):
         return
 
+    if node.text is None:
+        return
     name = node.text.decode("utf-8")
     parent = node.parent
     if parent is None:

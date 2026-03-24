@@ -12,6 +12,7 @@ resolution and venv introspection remain unchanged.
 import glob as glob_module
 import keyword
 import re
+import sysconfig
 from pathlib import Path
 
 from editor.autocomplete import CompletionItem, CompletionKind
@@ -421,6 +422,8 @@ class PythonCompletionProvider:
         """Find the module path and original name for an imported symbol.
 
         Returns (module_path, original_name) or None.
+        For ``from X import Y``: returns ``("X", "Y")``.
+        For ``import X`` (whole-module): returns ``("X", None)``.
         """
         root = tree.root_node
         from editor.autocomplete.tree_sitter_provider import _node_text
@@ -444,6 +447,10 @@ class PythonCompletionProvider:
                             return module_path, _node_text(source, orig) if orig else name
                         if not alias and orig and _node_text(source, orig) == name:
                             return module_path, name
+            elif child.type == "import_statement":
+                result = PythonCompletionProvider._find_whole_module_import(source, child, name)
+                if result:
+                    return result
             # Handle try/except blocks containing imports
             elif child.type == "try_statement":
                 for body_child in child.children:
@@ -456,6 +463,10 @@ class PythonCompletionProvider:
                         for stmt in block.children:
                             if stmt.type == "import_from_statement":
                                 result = PythonCompletionProvider._find_import_in_stmt(source, stmt, name)
+                                if result:
+                                    return result
+                            elif stmt.type == "import_statement":
+                                result = PythonCompletionProvider._find_whole_module_import(source, stmt, name)
                                 if result:
                                     return result
         return None
@@ -482,6 +493,28 @@ class PythonCompletionProvider:
                     return module_path, _node_text(source, orig) if orig else name
                 if not alias and orig and _node_text(source, orig) == name:
                     return module_path, name
+        return None
+
+    @staticmethod
+    def _find_whole_module_import(source, stmt, name):
+        """Check an import_statement for a whole-module import matching *name*.
+
+        Handles ``import threading`` and ``import threading as th``.
+        Returns ``(module_path, None)`` where ``None`` signals a whole-module import.
+        """
+        from editor.autocomplete.tree_sitter_provider import _node_text
+
+        for child in stmt.children:
+            if child.type == "dotted_name":
+                if _node_text(source, child) == name:
+                    return name, None
+            elif child.type == "aliased_import":
+                alias = child.child_by_field_name("alias")
+                orig = child.child_by_field_name("name")
+                if alias and _node_text(source, alias) == name:
+                    return _node_text(source, orig) if orig else name, None
+                if not alias and orig and _node_text(source, orig) == name:
+                    return name, None
         return None
 
     @staticmethod
@@ -642,6 +675,19 @@ class PythonCompletionProvider:
         m_source, m_tree = _parse(module_text, "python")
         if m_tree is None:
             return []
+
+        # Whole-module import (e.g., ``import threading``): original_name is None
+        if original_name is None:
+            if len(parts) == 1:
+                # ``threading.`` → show all top-level symbols from the module
+                result = py_extract_file_symbols(m_source, m_tree)
+                if isinstance(result, tuple):
+                    symbols, _ = result
+                    return sorted(symbols.values(), key=lambda x: x.name)
+                return result
+            else:
+                # ``threading.Thread.`` → resolve chain within the module
+                return py_resolve_chain(m_source, m_tree, parts[1:])
 
         chain = [original_name] + parts[1:]
         result = py_resolve_chain(m_source, m_tree, chain)
@@ -844,8 +890,23 @@ class PythonCompletionProvider:
             current = current.parent
         return []
 
+    _stdlib_path: Path | None = None
+    _stdlib_path_resolved: bool = False
+
+    @classmethod
+    def _get_stdlib_path(cls):
+        """Return the Python stdlib directory, cached across calls."""
+        if not cls._stdlib_path_resolved:
+            try:
+                stdlib = sysconfig.get_paths().get("stdlib")
+                cls._stdlib_path = Path(stdlib) if stdlib and Path(stdlib).is_dir() else None
+            except Exception:
+                cls._stdlib_path = None
+            cls._stdlib_path_resolved = True
+        return cls._stdlib_path
+
     def _find_module_file(self, rel_path, file_path):
-        """Find the .py file for a module, searching project dirs then venv."""
+        """Find the .py file for a module, searching project dirs, venv, then stdlib."""
         current = Path(file_path).parent
         searched = set()
         while current != current.parent:
@@ -866,6 +927,14 @@ class PythonCompletionProvider:
             py_file = sp / f"{rel_path}.py"
             if not py_file.is_file():
                 py_file = sp / rel_path / "__init__.py"
+            if py_file.is_file():
+                return py_file
+        # Fallback: search Python stdlib
+        stdlib_dir = self._get_stdlib_path()
+        if stdlib_dir:
+            py_file = stdlib_dir / f"{rel_path}.py"
+            if not py_file.is_file():
+                py_file = stdlib_dir / rel_path / "__init__.py"
             if py_file.is_file():
                 return py_file
         return None
