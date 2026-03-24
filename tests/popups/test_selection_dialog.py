@@ -178,4 +178,4 @@ class TestShowSelectionHelper:
 
     def test_show_selection_checks_nvim_mode(self):
         source = read_popup_source("selection_dialog.py")
-        assert "is_nvim_mode" in source
+        assert "show_popup" in source

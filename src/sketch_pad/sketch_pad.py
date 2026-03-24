@@ -13,12 +13,12 @@ from icons import Icons, get_icon_font_name
 from sketch_pad.global_settings_popup import GlobalDiagramSettingsPopup
 from sketch_pad.sketch_canvas import SketchCanvas
 from sketch_pad.sketch_model import ArrowLineStyle, ArrowShape, Board, ToolMode
-from themes import subscribe_theme_change, unsubscribe_theme_change
+from themes import ThemeAwareMixin
 
 _MOD = Gdk.ModifierType.META_MASK if platform.system() == "Darwin" else Gdk.ModifierType.CONTROL_MASK
 
 
-class SketchPad(Gtk.Box):
+class SketchPad(ThemeAwareMixin, Gtk.Box):
     """ASCII diagram editor – 3 tools: Select, Rectangle, Arrow."""
 
     def __init__(self):
@@ -31,7 +31,7 @@ class SketchPad(Gtk.Box):
         self._apply_styles()
         self._apply_theme_colors()
 
-        subscribe_theme_change(self._on_theme_change)
+        self._subscribe_theme()
 
     # ───────────────────────── UI setup ─────────────────────────
 
@@ -444,7 +444,7 @@ class SketchPad(Gtk.Box):
         self._canvas_widget.zoom(delta)
 
     def destroy(self):
-        unsubscribe_theme_change(self._on_theme_change)
+        self._unsubscribe_theme()
 
     # ───────────────────────── Styles ─────────────────────────
 

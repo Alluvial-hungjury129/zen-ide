@@ -76,6 +76,24 @@ def unsubscribe_theme_change(callback: Callable[[Theme], None]) -> None:
         _theme_subscribers.remove(callback)
 
 
+class ThemeAwareMixin:
+    """Mixin for classes that need to react to theme changes.
+
+    Subclasses must implement ``_on_theme_change(self, theme)`` and
+    call ``_subscribe_theme()`` in their ``__init__``.  Call
+    ``_unsubscribe_theme()`` in any cleanup / destroy path.
+    """
+
+    def _subscribe_theme(self) -> None:
+        subscribe_theme_change(self._on_theme_change)
+
+    def _unsubscribe_theme(self) -> None:
+        unsubscribe_theme_change(self._on_theme_change)
+
+    def _on_theme_change(self, theme: "Theme") -> None:
+        raise NotImplementedError
+
+
 def get_theme_names() -> List[tuple]:
     """Get list of available theme names without importing theme modules."""
     from themes.theme_definitions import get_theme_metadata

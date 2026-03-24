@@ -25,7 +25,7 @@ from shared.main_thread import main_thread_call
 from shared.settings import get_setting
 from shared.ui import ZenButton
 from shared.ui.zen_entry import ZenEntry
-from themes import get_theme, subscribe_theme_change
+from themes import ThemeAwareMixin, get_theme
 
 
 def _abbreviate_path(path: str, max_len: int = 50) -> str:
@@ -45,7 +45,7 @@ def _abbreviate_path(path: str, max_len: int = 50) -> str:
     return path[:half] + "..." + path[-half:]
 
 
-class DevPad(Gtk.Box):
+class DevPad(ThemeAwareMixin, Gtk.Box):
     """
     Activity tracking panel that shows recent user activities.
     Uses a scrolled window with native GTK widgets.
@@ -83,8 +83,7 @@ class DevPad(Gtk.Box):
         self._setup_ui()
         self._apply_styles()
 
-        # Subscribe to theme changes
-        subscribe_theme_change(self._on_theme_change)
+        self._subscribe_theme()
 
     def _get_font_settings(self):
         """Get font settings from config (uses editor fonts)."""

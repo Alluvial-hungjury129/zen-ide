@@ -85,13 +85,18 @@ def show_confirm(
     on_cancel=None,
 ):
     """Show a confirmation dialog and return it."""
-    from popups.system_dialogs import is_nvim_mode
+    from popups.nvim_popup import show_popup
+    from popups.system_dialogs import system_confirm
 
-    if not is_nvim_mode():
-        from popups.system_dialogs import system_confirm
-
-        system_confirm(parent, title, message, confirm_text, cancel_text, danger, on_confirm, on_cancel)
-        return None
-    dialog = ConfirmDialog(parent, title, message, confirm_text, cancel_text, danger, on_confirm, on_cancel)
-    dialog.present()
-    return dialog
+    return show_popup(
+        ConfirmDialog,
+        system_confirm,
+        parent,
+        title,
+        message,
+        confirm_text,
+        cancel_text,
+        danger,
+        on_confirm,
+        on_cancel,
+    )

@@ -1456,3 +1456,31 @@ class NvimPopup(Gtk.Window):
             self._buttons[self._selected_idx].grab_focus()
             return True
         return False
+
+
+def show_popup(nvim_cls, system_fallback, parent, *args, **kwargs):
+    """Generic factory for showing a popup with nvim/system mode switching.
+
+    Args:
+        nvim_cls: The NvimPopup subclass to use in nvim mode.
+        system_fallback: System dialog class/function to use otherwise.
+            If callable with a ``present`` attr on the result, it's treated
+            as a class (instantiated then presented). Otherwise it's called
+            directly as a function and None is returned.
+        parent: Parent Gtk.Window.
+        *args, **kwargs: Forwarded to both nvim_cls and system_fallback.
+
+    Returns:
+        The dialog instance, or None for system-function fallbacks.
+    """
+    from popups.system_dialogs import is_nvim_mode
+
+    if not is_nvim_mode():
+        result = system_fallback(parent, *args, **kwargs)
+        if hasattr(result, "present"):
+            result.present()
+            return result
+        return None
+    dialog = nvim_cls(parent, *args, **kwargs)
+    dialog.present()
+    return dialog

@@ -443,11 +443,17 @@ class AITerminalView(JogWheelScrollbarMixin, TerminalView):
         p = cli_manager.get(self._current_provider) if self._current_provider else None
         return p.sessions_dir(cwd=self.cwd) if p else None
 
-    def _detect_session_id(self) -> bool:
-        """Detect the session ID created by the just-spawned CLI."""
+    def _detect_session_id(self, claimed_ids: set[str] | None = None) -> bool:
+        """Detect the session ID created by the just-spawned CLI.
+
+        *claimed_ids*, when provided, contains session IDs already owned by
+        other tabs and must be excluded from detection.
+        """
         pre = getattr(self, "_pre_spawn_sessions", None) or set()
         current = self._list_sessions()
         new_sessions = current - pre
+        if claimed_ids:
+            new_sessions -= claimed_ids
 
         p = cli_manager.get(self._current_provider) if self._current_provider else None
         sessions_dir = p.sessions_dir(cwd=self.cwd) if p else None
@@ -473,11 +479,17 @@ class AITerminalView(JogWheelScrollbarMixin, TerminalView):
         elif not new_sessions and not self._session_id and sessions_dir:
             # --continue was used and no new file appeared — the CLI reused
             # the most recent session.  Find it by modification time.
+            excluded = claimed_ids or set()
             try:
                 entries = list(sessions_dir.iterdir())
                 if entries:
-                    latest = max(entries, key=lambda f: f.stat().st_mtime)
-                    self._session_id = latest.stem if latest.suffix else latest.name
+                    # Sort by mtime descending; pick the first unclaimed entry
+                    entries.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+                    for entry in entries:
+                        sid = entry.stem if entry.suffix else entry.name
+                        if sid not in excluded:
+                            self._session_id = sid
+                            break
             except (ValueError, OSError):
                 pass
         self._pre_spawn_sessions = None  # cleanup
@@ -616,15 +628,15 @@ class AITerminalView(JogWheelScrollbarMixin, TerminalView):
         self._jog_setup_scroll_controller()
 
     def _jog_scroll_lines(self, lines: int) -> None:
-        """Send simulated SGR mouse-wheel events to the CLI."""
-        cols = self.terminal.get_column_count()
-        rows = self.terminal.get_row_count()
-        mid_col = max(1, cols // 2)
-        mid_row = max(1, rows // 2)
-        button = 65 if lines > 0 else 64  # 65=down, 64=up
-        seq = f"\033[<{button};{mid_col};{mid_row}M".encode()
-        for _ in range(min(abs(lines), 15)):
-            self.terminal.feed_child(seq)
+        """Scroll via VTE's vadjustment (scrollback buffer)."""
+        vadj = self.terminal.get_vadjustment()
+        if vadj is None:
+            return
+        char_height = self.terminal.get_char_height()
+        new_val = vadj.get_value() + lines * char_height
+        lower = vadj.get_lower()
+        upper = vadj.get_upper() - vadj.get_page_size()
+        vadj.set_value(max(lower, min(new_val, upper)))
 
     def _on_contents_changed(self, _terminal) -> None:
         """Track CLI output for idle detection."""

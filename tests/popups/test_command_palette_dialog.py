@@ -179,4 +179,4 @@ class TestShowCommandPaletteHelper:
 
     def test_show_command_palette_checks_nvim_mode(self):
         source = read_popup_source("command_palette_dialog.py")
-        assert "is_nvim_mode" in source
+        assert "show_popup" in source

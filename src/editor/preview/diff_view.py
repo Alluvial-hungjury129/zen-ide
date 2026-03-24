@@ -21,7 +21,7 @@ from shared.main_thread import main_thread_call
 from shared.settings import get_setting
 from shared.ui import ZenButton
 from shared.ui.zen_entry import ZenSearchEntry
-from themes import get_theme, subscribe_theme_change
+from themes import ThemeAwareMixin, get_theme
 
 # Diff colors as (R, G, B, alpha) for blending with theme background
 DIFF_ADD_RGBA = (46, 160, 67, 0.40)
@@ -278,7 +278,7 @@ class DiffMinimap(Gtk.Widget):
         self._diff_view._scroll_to_line(target_line)
 
 
-class DiffView(FocusBorderMixin, Gtk.Box):
+class DiffView(ThemeAwareMixin, FocusBorderMixin, Gtk.Box):
     """Side-by-side diff view showing changes with commit history navigation."""
 
     COMPONENT_ID = "diff_view"
@@ -355,7 +355,7 @@ class DiffView(FocusBorderMixin, Gtk.Box):
         self._active_search_side = "right"  # which side has the active cursor
 
         self._create_ui()
-        subscribe_theme_change(self._on_theme_change)
+        self._subscribe_theme()
 
     def _create_ui(self):
         # ESC and arrow key handler (CAPTURE phase to intercept before child widgets)

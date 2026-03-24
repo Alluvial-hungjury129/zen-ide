@@ -96,26 +96,16 @@ def show_save_all_confirm(
     on_discard_all=None,
     on_cancel=None,
 ):
-    """
-    Show a save-all confirmation popup for multiple unsaved files.
+    """Show a save-all confirmation popup for multiple unsaved files."""
+    from popups.nvim_popup import show_popup
+    from popups.system_dialogs import system_save_all_confirm
 
-    Args:
-        parent: Parent window
-        filenames: List of unsaved file names
-        on_save_all: Callback when Save All is selected
-        on_discard_all: Callback when Discard All is selected
-        on_cancel: Callback when Cancel is selected
-
-    Returns:
-        The SaveAllConfirmPopup instance, or None for system-style dialog
-    """
-    from popups.system_dialogs import is_nvim_mode
-
-    if not is_nvim_mode():
-        from popups.system_dialogs import system_save_all_confirm
-
-        system_save_all_confirm(parent, filenames, on_save_all, on_discard_all, on_cancel)
-        return None
-    popup = SaveAllConfirmPopup(parent, filenames, on_save_all, on_discard_all, on_cancel)
-    popup.present()
-    return popup
+    return show_popup(
+        SaveAllConfirmPopup,
+        system_save_all_confirm,
+        parent,
+        filenames,
+        on_save_all,
+        on_discard_all,
+        on_cancel,
+    )

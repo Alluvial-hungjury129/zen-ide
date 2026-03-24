@@ -117,4 +117,4 @@ class TestShowInputHelper:
 
     def test_show_input_checks_nvim_mode(self):
         source = read_popup_source("input_dialog.py")
-        assert "is_nvim_mode" in source
+        assert "show_popup" in source

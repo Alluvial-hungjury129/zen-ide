@@ -5,6 +5,7 @@ Re-exports all public API from submodules.
 
 from themes.theme_definitions import THEMES
 from themes.theme_manager import (
+    ThemeAwareMixin,
     get_ai_settings,
     get_setting,
     get_theme,
@@ -21,6 +22,7 @@ from themes.theme_model import Theme
 
 __all__ = [
     "Theme",
+    "ThemeAwareMixin",
     "THEMES",
     "get_theme",
     "set_theme",

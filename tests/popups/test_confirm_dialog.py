@@ -112,4 +112,4 @@ class TestShowConfirmHelper:
 
     def test_show_confirm_checks_nvim_mode(self):
         source = read_popup_source("confirm_dialog.py")
-        assert "is_nvim_mode" in source
+        assert "show_popup" in source

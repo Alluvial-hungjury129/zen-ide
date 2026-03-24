@@ -19,7 +19,7 @@ from gi.repository import GLib, Gtk, Pango
 
 from editor.preview.preview_scroll_mixin import SCROLL_SYNC_JS, PreviewScrollMixin
 from gi_requirements import load_webkit
-from themes import get_theme, subscribe_theme_change
+from themes import ThemeAwareMixin, get_theme
 from themes.theme_manager import get_setting
 
 # --- Backend detection ---
@@ -562,7 +562,7 @@ class _SyncPlaceholder(Gtk.Widget):
             self._sync_func(self, w, h)
 
 
-class MarkdownPreview(PreviewScrollMixin, Gtk.Box):
+class MarkdownPreview(ThemeAwareMixin, PreviewScrollMixin, Gtk.Box):
     """Markdown preview using cmarkgfm. Rendering backends:
     1. WebKitGTK (Linux) - full HTML/CSS
     2. macOS native WKWebView (PyObjC) - full HTML/CSS overlaid on GTK4
@@ -592,7 +592,7 @@ class MarkdownPreview(PreviewScrollMixin, Gtk.Box):
         else:
             self._backend = "canvas"
         self._create_ui()
-        subscribe_theme_change(self._on_theme_change)
+        self._subscribe_theme()
         from fonts import subscribe_font_change
 
         subscribe_font_change(self._on_font_change)

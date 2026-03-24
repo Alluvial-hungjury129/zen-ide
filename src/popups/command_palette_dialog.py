@@ -227,14 +227,14 @@ def show_command_palette(
     placeholder: str = "Type a command...",
 ):
     """Show a command palette and return it."""
-    from popups.system_dialogs import is_nvim_mode
+    from popups.nvim_popup import show_popup
+    from popups.system_dialogs import SystemCommandPaletteDialog
 
-    if not is_nvim_mode():
-        from popups.system_dialogs import SystemCommandPaletteDialog
-
-        dialog = SystemCommandPaletteDialog(parent, commands, on_execute, placeholder)
-        dialog.present()
-        return dialog
-    dialog = CommandPaletteDialog(parent, commands, on_execute, placeholder)
-    dialog.present()
-    return dialog
+    return show_popup(
+        CommandPaletteDialog,
+        SystemCommandPaletteDialog,
+        parent,
+        commands,
+        on_execute,
+        placeholder,
+    )

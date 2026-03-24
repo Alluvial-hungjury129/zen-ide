@@ -759,6 +759,9 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
         # Now spawn all views
         if resume:
             used_continue = False
+            # Collect all saved session IDs so the --continue fallback
+            # can avoid picking a session that another tab already owns.
+            claimed_ids = {v._session_id for v in self._views if v._session_id}
             for view in self._views:
                 has_session = bool(getattr(view, "_session_id", None))
                 if has_session:
@@ -832,10 +835,14 @@ class AITerminalStack(FocusBorderMixin, Gtk.Box):
 
         if not new_ids:
             # Fallback: each view detects on its own (single tab --continue case)
+            # Pass claimed IDs so views don't pick sessions owned by other tabs.
             for v in views:
                 v._stack_detects = False
                 v._pre_spawn_sessions = pre_sessions
-                v._detect_session_id()
+                v._detect_session_id(claimed_ids=claimed)
+                # Add newly detected ID to claimed set for next iteration
+                if v._session_id:
+                    claimed.add(v._session_id)
             return
 
         # Sort new sessions by mtime (oldest first = first tab spawned)

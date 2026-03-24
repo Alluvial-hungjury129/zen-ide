@@ -16,9 +16,9 @@ from shared.git_ignore_utils import get_global_patterns, get_matcher, get_worksp
 from shared.settings import get_setting
 from shared.utils import hex_to_rgba
 from themes import (
+    ThemeAwareMixin,
     get_theme,
     subscribe_settings_change,
-    subscribe_theme_change,
 )
 from treeview.tree_canvas import TreeCanvas
 from treeview.tree_icons import (
@@ -37,6 +37,7 @@ _PRIMARY_MOD = Gdk.ModifierType.META_MASK if sys.platform == "darwin" else Gdk.M
 
 
 class CustomTreePanel(
+    ThemeAwareMixin,
     TreePanelRendererMixin,
     TreePanelDragMixin,
     TreePanelInlineEditMixin,
@@ -138,8 +139,8 @@ class CustomTreePanel(
         self.connect("notify::vadjustment", self._on_vadjustment_changed)
         GLib.idle_add(self._connect_vadjustment)
 
-        # Subscribe to theme changes
-        subscribe_theme_change(self._on_theme_change)
+        # Subscribe to theme/settings changes
+        self._subscribe_theme()
         subscribe_settings_change(self._on_settings_change)
 
     def _connect_vadjustment(self):

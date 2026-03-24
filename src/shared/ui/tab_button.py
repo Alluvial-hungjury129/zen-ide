@@ -119,6 +119,23 @@ class TabButton(Gtk.Box):
         self._title = title
         self.label.set_label(title)
 
+    # Subclasses set this to a font context name (e.g. "editor", "terminal")
+    # to enable automatic font family loading via apply_font_settings().
+    _font_context = None
+
+    def _load_font_family(self):
+        """Load font family from settings using _font_context."""
+        if not self._font_context:
+            return None
+        from fonts import get_font_settings
+
+        return get_font_settings(self._font_context)["family"]
+
+    def apply_font_settings(self):
+        """Re-read font settings and re-apply styling."""
+        self._font_family = self._load_font_family()
+        self._apply_theme()
+
     def _get_font_css(self):
         """Return custom font CSS. Override in subclasses."""
         return ""
@@ -162,6 +179,8 @@ class TabButton(Gtk.Box):
 class FileTabButton(TabButton):
     """Tab button for editor file tabs with modified indicator."""
 
+    _font_context = "editor"
+
     def __init__(self, tab_id, title, on_close=None, show_close=True):
         self._modified = False
         self._font_family = self._load_font_family()
@@ -199,20 +218,8 @@ class FileTabButton(TabButton):
         self._show_close = show
         self._indicator_stack.set_visible(show)
 
-    def _load_font_family(self):
-        """Load editor font family from settings."""
-        from fonts import get_font_settings
-
-        font_settings = get_font_settings("editor")
-        return font_settings["family"]
-
     def _get_font_css(self):
         return f"font-family: '{self._font_family}';"
-
-    def apply_font_settings(self):
-        """Re-read editor font settings and re-apply styling."""
-        self._font_family = self._load_font_family()
-        self._apply_theme()
 
     def _get_themed_widgets(self):
         return [self, self.label, self.close_btn, self._modified_indicator]

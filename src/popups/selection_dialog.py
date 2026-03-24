@@ -279,23 +279,12 @@ def show_selection(
     on_cancel=None,
 ):
     """Show a selection dialog and return it."""
-    from popups.system_dialogs import is_nvim_mode
+    from popups.nvim_popup import show_popup
+    from popups.system_dialogs import SystemSelectionDialog
 
-    if not is_nvim_mode():
-        from popups.system_dialogs import SystemSelectionDialog
-
-        dialog = SystemSelectionDialog(
-            parent,
-            title,
-            items,
-            on_select,
-            show_icons,
-            on_selection_change=on_selection_change,
-            on_cancel=on_cancel,
-        )
-        dialog.present()
-        return dialog
-    dialog = SelectionDialog(
+    return show_popup(
+        SelectionDialog,
+        SystemSelectionDialog,
         parent,
         title,
         items,
@@ -304,5 +293,3 @@ def show_selection(
         on_selection_change=on_selection_change,
         on_cancel=on_cancel,
     )
-    dialog.present()
-    return dialog

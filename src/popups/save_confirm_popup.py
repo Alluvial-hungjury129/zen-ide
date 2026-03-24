@@ -92,26 +92,16 @@ def show_save_confirm(
     on_discard=None,
     on_cancel=None,
 ):
-    """
-    Show a save confirmation popup.
+    """Show a save confirmation popup."""
+    from popups.nvim_popup import show_popup
+    from popups.system_dialogs import system_save_confirm
 
-    Args:
-        parent: Parent window
-        filename: Name of the file being closed
-        on_save: Callback when Save is selected
-        on_discard: Callback when Don't Save is selected
-        on_cancel: Callback when Cancel is selected
-
-    Returns:
-        The SaveConfirmPopup instance, or None for system-style dialog
-    """
-    from popups.system_dialogs import is_nvim_mode
-
-    if not is_nvim_mode():
-        from popups.system_dialogs import system_save_confirm
-
-        system_save_confirm(parent, filename, on_save, on_discard, on_cancel)
-        return None
-    popup = SaveConfirmPopup(parent, filename, on_save, on_discard, on_cancel)
-    popup.present()
-    return popup
+    return show_popup(
+        SaveConfirmPopup,
+        system_save_confirm,
+        parent,
+        filename,
+        on_save,
+        on_discard,
+        on_cancel,
+    )

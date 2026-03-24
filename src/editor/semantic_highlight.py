@@ -25,6 +25,8 @@ TAG_PARAM = "zen-param"
 TAG_SELF = "zen-self"
 TAG_PROPERTY = "zen-property"
 
+_SEM_TAGS = (TAG_CLASS_USAGE, TAG_FUNC_CALL, TAG_PARAM, TAG_SELF, TAG_PROPERTY)
+
 
 def _parse_hex(hex_color):
     """Parse '#RRGGBB' to Gdk.RGBA."""
@@ -78,16 +80,7 @@ def setup_semantic_highlight(tab, theme):
     else:
         prop_tag = buf.create_tag(TAG_PROPERTY, foreground_rgba=prop_color)
 
-    # Ensure semantic tags have higher priority than GtkSourceView's syntax
-    # tags so that e.g. a parameter named `type` gets the parameter color
-    # instead of the built-in highlight color.
-    max_prio = tag_table.get_size() - 1
-    for tag in (param_tag, self_tag, class_tag, func_tag, prop_tag):
-        if tag:
-            tag.set_priority(max_prio)
-
     # Debounced re-highlight on text changes and scroll.
-    # Runs at LOW priority so GTK rendering is never blocked.
     state = {"pending_id": 0}
 
     def _schedule_highlight(*_args):
@@ -96,13 +89,11 @@ def setup_semantic_highlight(tab, theme):
         state["pending_id"] = GLib.timeout_add(150, _enqueue_highlight)
 
     def _schedule_scroll_highlight(*_args):
-        """Re-highlight on scroll so newly visible lines get tags."""
         if state["pending_id"]:
             GLib.source_remove(state["pending_id"])
         state["pending_id"] = GLib.timeout_add(100, _enqueue_highlight)
 
     def _enqueue_highlight():
-        """After debounce, schedule actual work at low priority."""
         state["pending_id"] = 0
         GLib.idle_add(_do_highlight, priority=GLib.PRIORITY_LOW)
         return GLib.SOURCE_REMOVE
@@ -111,11 +102,13 @@ def setup_semantic_highlight(tab, theme):
         _apply_semantic_tags(buf, tab)
         return GLib.SOURCE_REMOVE
 
-    # Store handler id so we can avoid duplicate connections
     if not getattr(tab, "_semantic_handler_id", None):
         hid = buf.connect("changed", _schedule_highlight)
         tab._semantic_handler_id = hid
-        # Re-highlight when viewport scrolls to cover newly visible lines
+
+        # Re-apply semantic tags after GtkSourceView finishes highlighting.
+        buf.connect("highlight-updated", _schedule_highlight)
+
         view = tab.view
         vadj = view.get_vadjustment()
         if vadj:
@@ -149,11 +142,7 @@ def update_semantic_colors(tab, theme):
 
 
 def _apply_semantic_tags(buf, tab=None):
-    """Apply semantic highlighting tags to the visible range via tree-sitter.
-
-    Only highlights lines visible in the viewport (plus a margin) to keep
-    main-thread cost proportional to screen size, not file size.
-    """
+    """Apply semantic highlighting tags to the visible range via tree-sitter."""
     lang = buf.get_language()
     if not lang:
         return
@@ -176,29 +165,25 @@ def _apply_semantic_tags(buf, tab=None):
     if not ts_lang:
         return
 
-    # Full buffer text needed for tree-sitter parse (cached/incremental).
     start = buf.get_start_iter()
     end = buf.get_end_iter()
     text = buf.get_text(start, end, True)
 
-    # Determine visible line range (fall back to full buffer if no view).
+    # Determine visible line range.
     view = getattr(tab, "view", None)
     if view and view.get_mapped():
         visible_rect = view.get_visible_rect()
         top_iter = view.get_iter_at_location(visible_rect.x, visible_rect.y)
         bot_iter = view.get_iter_at_location(visible_rect.x, visible_rect.y + visible_rect.height)
-        # Handle (bool, iter) tuple return variant
         top_line = (top_iter[1] if isinstance(top_iter, tuple) else top_iter).get_line()
         bot_line = (bot_iter[1] if isinstance(bot_iter, tuple) else bot_iter).get_line()
         margin = max((bot_line - top_line), 40)
         vis_start_line = max(0, top_line - margin)
         vis_end_line = bot_line + margin
     else:
-        # View not mapped yet — limit to first screenful (~80 lines)
         vis_start_line = 0
         vis_end_line = 80
 
-    # Compute byte offsets for the visible range.
     vis_start_iter = buf.get_iter_at_line(vis_start_line)
     vis_end_iter = buf.get_iter_at_line(vis_end_line)
     if isinstance(vis_start_iter, tuple):
@@ -210,9 +195,20 @@ def _apply_semantic_tags(buf, tab=None):
     vis_start_char = vis_start_iter.get_offset()
     vis_end_char = vis_end_iter.get_offset()
 
-    # Remove existing semantic tags only in the visible range.
-    for tag_name in (TAG_CLASS_USAGE, TAG_FUNC_CALL, TAG_PARAM, TAG_SELF, TAG_PROPERTY):
-        buf.remove_tag_by_name(tag_name, vis_start_iter, vis_end_iter)
+    # Only remove+reapply tags when the text has actually changed.
+    # When called from highlight-updated (same text, engine just
+    # re-highlighted), skip removal so we don't invalidate the display
+    # cache that our previous emit("changed") set up.
+    text_gen = buf.get_char_count()  # cheap proxy for "text changed"
+    text_changed = getattr(tab, "_sem_last_gen", -1) != text_gen
+    if tab:
+        tab._sem_last_gen = text_gen
+
+    buf_start = buf.get_start_iter()
+    buf_end = buf.get_end_iter()
+    if text_changed:
+        for tag_name in _SEM_TAGS:
+            buf.remove_tag_by_name(tag_name, buf_start, buf_end)
 
     tag_table = buf.get_tag_table()
     class_tag = tag_table.lookup(TAG_CLASS_USAGE)
@@ -227,14 +223,10 @@ def _apply_semantic_tags(buf, tab=None):
     if tree is None:
         return
 
-    # Compute visible byte range for AST pruning.
-    # For pure ASCII, byte offsets equal char offsets.
     text_bytes = text.encode("utf-8")
     need_mapping = len(text) != len(text_bytes)
     if need_mapping:
-        # Build full byte map — needed for tag application anyway
         byte_to_char = _build_byte_to_char_map(text)
-        # Invert to get char→byte for visible range boundaries
         char_to_byte = {v: k for k, v in byte_to_char.items()}
         vis_start_byte = char_to_byte.get(vis_start_char, 0)
         vis_end_byte = char_to_byte.get(vis_end_char, len(text_bytes))
@@ -258,7 +250,6 @@ def _apply_semantic_tags(buf, tab=None):
         "property": prop_tag,
     }
 
-    # Apply tags — tokens are already range-pruned by extract_semantic_tokens.
     if need_mapping:
         for start_byte, end_byte, token_type in tokens:
             s = byte_to_char.get(start_byte)
@@ -272,6 +263,28 @@ def _apply_semantic_tags(buf, tab=None):
             tag = tag_map.get(token_type)
             if tag is not None:
                 _apply_tag_at_offsets(buf, tag, start_byte, end_byte)
+
+    # Ensure our tags always win over GtkSourceView's engine tags.
+    max_prio = tag_table.get_size() - 1
+    for tag in (class_tag, func_tag, param_tag, self_tag, prop_tag):
+        if tag:
+            tag.set_priority(max_prio)
+
+    # After the very first tag application, defer an emit("changed") to
+    # force GtkSourceView to rebuild its display cache with our tags.
+    # Must run AFTER the current highlight-updated cycle finishes.
+    if tab and not getattr(tab, "_sem_first_paint_done", False):
+        tab._sem_first_paint_done = True
+        if tokens:
+            def _deferred_emit():
+                handler_id = getattr(tab, "_semantic_handler_id", None)
+                if handler_id:
+                    buf.handler_block(handler_id)
+                buf.emit("changed")
+                if handler_id:
+                    buf.handler_unblock(handler_id)
+                return GLib.SOURCE_REMOVE
+            GLib.idle_add(_deferred_emit, priority=GLib.PRIORITY_HIGH)
 
 
 def _build_byte_to_char_map(text: str) -> dict:

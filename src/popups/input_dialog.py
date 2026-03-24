@@ -112,14 +112,17 @@ def show_input(
     validate=None,
 ):
     """Show an input dialog and return it."""
-    from popups.system_dialogs import is_nvim_mode
+    from popups.nvim_popup import show_popup
+    from popups.system_dialogs import SystemInputDialog
 
-    if not is_nvim_mode():
-        from popups.system_dialogs import SystemInputDialog
-
-        dialog = SystemInputDialog(parent, title, message, placeholder, initial_value, on_submit, validate)
-        dialog.present()
-        return dialog
-    dialog = InputDialog(parent, title, message, placeholder, initial_value, on_submit, validate)
-    dialog.present()
-    return dialog
+    return show_popup(
+        InputDialog,
+        SystemInputDialog,
+        parent,
+        title,
+        message,
+        placeholder,
+        initial_value,
+        on_submit,
+        validate,
+    )

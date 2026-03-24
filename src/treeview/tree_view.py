@@ -16,12 +16,12 @@ from shared.focus_border_mixin import FocusBorderMixin
 from shared.focus_manager import get_component_focus_manager
 from shared.git_manager import get_git_manager
 from shared.main_thread import main_thread_call
-from themes import get_theme, subscribe_theme_change
+from themes import ThemeAwareMixin, get_theme
 from treeview.tree_panel import CustomTreePanel
 from treeview.tree_view_actions import TreeViewActionsMixin
 
 
-class TreeView(TreeViewActionsMixin, FocusBorderMixin, Gtk.Box):
+class TreeView(ThemeAwareMixin, TreeViewActionsMixin, FocusBorderMixin, Gtk.Box):
     """File tree explorer panel with neovim-style indent guides."""
 
     COMPONENT_ID = "treeview"
@@ -61,8 +61,7 @@ class TreeView(TreeViewActionsMixin, FocusBorderMixin, Gtk.Box):
 
         self._create_ui()
 
-        # Subscribe to theme changes
-        subscribe_theme_change(self._on_theme_change)
+        self._subscribe_theme()
 
         # Add click controller to gain focus
         click_ctrl = Gtk.GestureClick.new()
