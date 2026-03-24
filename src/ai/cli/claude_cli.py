@@ -11,7 +11,6 @@ from ai.cli.cli_manager import CLIProvider
 
 
 class ClaudeCLI(CLIProvider):
-
     @property
     def id(self) -> str:
         return "claude_cli"
