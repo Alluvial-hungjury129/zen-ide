@@ -46,11 +46,6 @@ if ! command -v gh &>/dev/null; then
     exit 1
 fi
 
-if ! gh auth status &>/dev/null; then
-    echo "Error: 'gh' is not authenticated. Run: gh auth login"
-    exit 1
-fi
-
 CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
 if [ -z "$CURRENT_BRANCH" ]; then
     echo "Error: not on a git branch (detached HEAD?)."
@@ -59,6 +54,11 @@ fi
 
 if [ "$CURRENT_BRANCH" = "$BASE_BRANCH" ]; then
     echo "Error: already on '$BASE_BRANCH'. Switch to a feature branch first."
+    exit 1
+fi
+
+if ! gh auth status &>/dev/null; then
+    echo "Error: 'gh' is not authenticated. Run: gh auth login"
     exit 1
 fi
 
@@ -211,10 +211,11 @@ if ! git ls-remote --exit-code --heads origin "$CURRENT_BRANCH" &>/dev/null; the
 fi
 
 echo "Creating PR ..."
-gh pr create \
+PR_URL=$(gh pr create \
     --base "$BASE_BRANCH" \
     --head "$CURRENT_BRANCH" \
     --title "$PR_TITLE" \
-    --body "$PR_BODY"
+    --body "$PR_BODY")
 
-echo "Done!"
+echo ""
+echo "Done! $PR_URL"
