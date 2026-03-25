@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+# open_pr — Create a GitHub PR with an AI-generated description.
+#
+# Usage:
+#   open_pr              Create PR for current branch against main
+#   open_pr -b develop   Create PR against a custom base branch
+#   open_pr -h           Show help
+#
+# Requirements: gh (GitHub CLI), and optionally claude or copilot CLI for
+# AI-generated descriptions. Falls back to commit log if no AI CLI is found.
+
+set -uo pipefail
+
+BASE_BRANCH="main"
+MAX_DIFF_CHARS=12000
+
+usage() {
+    cat <<EOF
+Usage: open_pr [-b base_branch] [-h]
+
+Create a GitHub PR with an AI-generated title and description.
+
+Options:
+  -b BRANCH   Base branch to merge into (default: main)
+  -h           Show this help message
+
+Requirements:
+  - gh (GitHub CLI) — authenticated
+  - claude or copilot CLI (optional, for AI-generated descriptions)
+EOF
+    exit 0
+}
+
+while getopts "b:h" opt; do
+    case "$opt" in
+        b) BASE_BRANCH="$OPTARG" ;;
+        h) usage ;;
+        *) usage ;;
+    esac
+done
+
+# --- Pre-flight checks ---
+
+if ! command -v gh &>/dev/null; then
+    echo "Error: 'gh' (GitHub CLI) is required. Install it: https://cli.github.com"
+    exit 1
+fi
+
+if ! gh auth status &>/dev/null; then
+    echo "Error: 'gh' is not authenticated. Run: gh auth login"
+    exit 1
+fi
+
+CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+if [ -z "$CURRENT_BRANCH" ]; then
+    echo "Error: not on a git branch (detached HEAD?)."
+    exit 1
+fi
+
+if [ "$CURRENT_BRANCH" = "$BASE_BRANCH" ]; then
+    echo "Error: already on '$BASE_BRANCH'. Switch to a feature branch first."
+    exit 1
+fi
+
+# Check for existing PR
+EXISTING_PR=$(gh pr list --head "$CURRENT_BRANCH" --base "$BASE_BRANCH" --json number,url --jq '.[0].url // empty' 2>/dev/null || true)
+if [ -n "$EXISTING_PR" ]; then
+    echo "A PR already exists for this branch: $EXISTING_PR"
+    exit 0
+fi
+
+# --- Gather context ---
+
+echo "Gathering changes for $CURRENT_BRANCH → $BASE_BRANCH ..."
+
+COMMIT_LOG=$(git log --oneline "$BASE_BRANCH".."$CURRENT_BRANCH" 2>/dev/null || echo "(no commits)")
+DIFF_STAT=$(git diff --stat "$BASE_BRANCH"..."$CURRENT_BRANCH" 2>/dev/null || echo "(no diff)")
+DIFF_CONTENT=$(git diff "$BASE_BRANCH"..."$CURRENT_BRANCH" 2>/dev/null || echo "")
+
+# Truncate large diffs to stay within AI context limits
+if [ ${#DIFF_CONTENT} -gt $MAX_DIFF_CHARS ]; then
+    DIFF_CONTENT="${DIFF_CONTENT:0:$MAX_DIFF_CHARS}
+... (diff truncated at ${MAX_DIFF_CHARS} chars)"
+fi
+
+CONTEXT="## Commits
+$COMMIT_LOG
+
+## Diff stat
+$DIFF_STAT
+
+## Diff
+$DIFF_CONTENT"
+
+# --- AI description generation ---
+
+AI_PROMPT="You are a senior developer writing a GitHub pull request description.
+Given the following git changes from branch '$CURRENT_BRANCH' into '$BASE_BRANCH',
+generate only the PR body (no title).
+
+Rules:
+- Start with '## Description' as a markdown heading.
+- Write exactly 3 lines of description: a concise, confident summary of what the changes do and why they matter.
+- Be direct, opinionated, and add some personality — avoid corporate fluff.
+- Do not include raw diffs, stats, commit hashes, or bullet points.
+
+$CONTEXT"
+
+generate_with_ai() {
+    local ai_bin=""
+
+    # Try claude first, then copilot (check PATH, then common install locations)
+    for candidate in claude copilot; do
+        if command -v "$candidate" &>/dev/null; then
+            ai_bin=$(command -v "$candidate")
+            break
+        fi
+    done
+
+    # If not in PATH, search NVM and common install dirs
+    if [ -z "$ai_bin" ]; then
+        local nvm_dir="${NVM_DIR:-$HOME/.nvm}"
+        if [ -d "$nvm_dir/versions/node" ]; then
+            for v in $(ls -r "$nvm_dir/versions/node/" 2>/dev/null); do
+                for name in claude copilot; do
+                    local c="$nvm_dir/versions/node/$v/bin/$name"
+                    if [ -x "$c" ]; then
+                        ai_bin="$c"
+                        break 2
+                    fi
+                done
+            done
+        fi
+    fi
+
+    if [ -z "$ai_bin" ]; then
+        for c in "$HOME/.local/bin/claude" "$HOME/.local/bin/copilot" \
+                 "/usr/local/bin/claude" "/usr/local/bin/copilot"; do
+            if [ -x "$c" ]; then
+                ai_bin="$c"
+                break
+            fi
+        done
+    fi
+
+    if [ -z "$ai_bin" ]; then
+        return 1
+    fi
+
+    local ai_output=""
+    local ai_name
+    ai_name=$(basename "$ai_bin")
+    echo "Using $ai_name to generate PR description ..." >&2
+
+    if [ "$ai_name" = "claude" ]; then
+        ai_output=$(echo "$AI_PROMPT" | "$ai_bin" --print 2>/dev/null) || return 1
+    elif [ "$ai_name" = "copilot" ]; then
+        ai_output=$("$ai_bin" -p "$AI_PROMPT" --allow-all-tools 2>/dev/null) || return 1
+    else
+        return 1
+    fi
+
+    if [ -z "$ai_output" ]; then
+        return 1
+    fi
+
+    echo "$ai_output"
+}
+
+PR_TITLE="$CURRENT_BRANCH"
+
+PR_BODY=$(generate_with_ai) || {
+    echo "Error: no AI CLI found. Install 'claude' or 'copilot' CLI to generate PR descriptions."
+    exit 1
+}
+
+# --- Push & create PR ---
+
+echo ""
+echo "Title: $PR_TITLE"
+echo "---"
+echo "$PR_BODY"
+echo "---"
+echo ""
+
+# Ensure the branch is pushed
+if ! git ls-remote --exit-code --heads origin "$CURRENT_BRANCH" &>/dev/null; then
+    echo "Pushing branch to origin ..."
+    git push -u origin "$CURRENT_BRANCH"
+fi
+
+echo "Creating PR ..."
+gh pr create \
+    --base "$BASE_BRANCH" \
+    --head "$CURRENT_BRANCH" \
+    --title "$PR_TITLE" \
+    --body "$PR_BODY"
+
+echo "Done!"

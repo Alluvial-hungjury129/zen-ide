@@ -118,6 +118,11 @@ alias gst='git status'
 alias groh='git reset --hard @{u}'
 alias git_prune_branches='git branch | grep -v "^\\*" | grep -v "^  main$" | xargs git branch -D'
 
+# Zen IDE tools (open_pr, etc.)
+if [ -d "$__zen_tools_dir" ]; then
+    export PATH="$__zen_tools_dir:$PATH"
+fi
+
 # Source user custom aliases
 if [ -f ~/.zen_ide/aliases ]; then
     . ~/.zen_ide/aliases 2>/dev/null
@@ -204,7 +209,11 @@ set -o history
             if not os.path.exists(self.config_dir):
                 os.makedirs(self.config_dir)
             bashrc_path = os.path.join(self.config_dir, "bashrc")
+            # Resolve tools/ directory relative to source tree
+            src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            tools_dir = os.path.join(os.path.dirname(src_dir), "tools")
             with open(bashrc_path, "w") as f:
+                f.write(f'__zen_tools_dir="{tools_dir}"\n')
                 f.write(bashrc_content)
             return bashrc_path
         except Exception:
