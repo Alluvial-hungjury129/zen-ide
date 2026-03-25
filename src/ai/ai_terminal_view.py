@@ -304,6 +304,13 @@ class AITerminalView(JogWheelScrollbarMixin, TerminalView):
 
     def _on_child_exited(self, terminal, status) -> None:
         """Handle CLI exit — detect resume failure and retry fresh."""
+        # Stop spinner and idle poll — the CLI is gone.
+        if self._waiting_for_response:
+            self._waiting_for_response = False
+            self._stop_idle_poll()
+            if callable(self.on_processing_changed):
+                self.on_processing_changed(False)
+
         if self._shutting_down:
             return
         if self._resume_attempted:

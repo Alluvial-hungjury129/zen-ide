@@ -29,12 +29,40 @@ SEVERITY_ERROR = "error"
 SEVERITY_WARNING = "warning"
 SEVERITY_INFO = "info"
 
-_SKIP_SEGMENTS = ("/node_modules/", "/__pycache__/", "/.venv/", "/venv/")
+_SKIP_SEGMENTS = (
+    # JS / Node
+    "/node_modules/",
+    # Python caches & virtual envs
+    "/__pycache__/",
+    "/.venv/",
+    "/venv/",
+    "/env/",
+    "/.env/",
+    "/site-packages/",
+    # VCS internals
+    "/.git/",
+    # Build / dist artifacts
+    "/dist/",
+    "/build/",
+    "/.eggs/",
+    "/.tox/",
+    "/.nox/",
+)
+
+_SYSTEM_PREFIXES = (
+    "/usr/lib/",
+    "/usr/local/lib/",
+    "/usr/local/Cellar/",
+    "/opt/homebrew/",
+    "/Library/Frameworks/Python.framework/",
+)
 
 
 def _is_ignored_path(path: str) -> bool:
-    """Return True if path is inside a commonly ignored directory."""
-    return any(seg in path for seg in _SKIP_SEGMENTS)
+    """Return True if path is inside a library, venv, or system directory."""
+    if any(seg in path for seg in _SKIP_SEGMENTS):
+        return True
+    return any(path.startswith(p) for p in _SYSTEM_PREFIXES)
 
 
 def _find_venv_binary(binary: str, start_dir: str) -> str | None:

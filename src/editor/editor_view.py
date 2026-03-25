@@ -1355,6 +1355,22 @@ class EditorTab:
         if ic is not None and ic.is_active:
             ic.dismiss()
 
+        # Get modifier state early — Cmd+Click navigation has highest priority
+        state = gesture.get_current_event_state()
+        if platform.system() == "Darwin":
+            is_cmd_click = bool(state & Gdk.ModifierType.META_MASK)
+        else:
+            is_cmd_click = bool(state & Gdk.ModifierType.CONTROL_MASK)
+
+        if n_press == 1 and is_cmd_click:
+            # Cmd+Click: navigate to definition
+            bx, by = self.view.window_to_buffer_coords(Gtk.TextWindowType.WIDGET, int(x), int(y))
+            over_text, it = self.view.get_iter_at_location(bx, by)
+            if over_text and self._cmd_click_callback:
+                gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+                self._cmd_click_callback(self.buffer, self.view, self.file_path, it)
+                return True
+
         # Single click on diagnostic underline: show popover
         if n_press == 1 and hasattr(self, "_diag_error_tag"):
             bx, by = self.view.window_to_buffer_coords(Gtk.TextWindowType.WIDGET, int(x), int(y))
@@ -1376,24 +1392,6 @@ class EditorTab:
             if hit:
                 gesture.set_state(Gtk.EventSequenceState.CLAIMED)
                 self._open_color_picker(*hit)
-                return True
-
-        # Get modifier state
-        state = gesture.get_current_event_state()
-
-        # Check for Cmd (macOS) or Ctrl (other platforms) modifier
-        if platform.system() == "Darwin":
-            is_cmd_click = bool(state & Gdk.ModifierType.META_MASK)
-        else:
-            is_cmd_click = bool(state & Gdk.ModifierType.CONTROL_MASK)
-
-        if n_press == 1 and is_cmd_click:
-            # Cmd+Click: navigate to definition
-            bx, by = self.view.window_to_buffer_coords(Gtk.TextWindowType.WIDGET, int(x), int(y))
-            over_text, it = self.view.get_iter_at_location(bx, by)
-            if over_text and self._cmd_click_callback:
-                gesture.set_state(Gtk.EventSequenceState.CLAIMED)
-                self._cmd_click_callback(self.buffer, self.view, self.file_path, it)
                 return True
 
         # Triple-click: select entire line

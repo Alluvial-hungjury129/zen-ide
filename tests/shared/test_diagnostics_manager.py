@@ -29,6 +29,32 @@ class TestIsIgnoredPath:
         assert _is_ignored_path("/project/.venv/lib/python3.13/site.py")
         assert _is_ignored_path("/project/venv/bin/python")
 
+    def test_env_variants(self):
+        assert _is_ignored_path("/project/env/lib/python3.13/site.py")
+        assert _is_ignored_path("/project/.env/bin/python")
+
+    def test_site_packages(self):
+        assert _is_ignored_path("/project/.venv/lib/python3.13/site-packages/requests/api.py")
+
+    def test_git_internals(self):
+        assert _is_ignored_path("/project/.git/objects/pack/pack-abc.idx")
+
+    def test_build_artifacts(self):
+        assert _is_ignored_path("/project/dist/bundle.js")
+        assert _is_ignored_path("/project/build/lib/pkg/mod.py")
+
+    def test_system_prefix_usr_lib(self):
+        assert _is_ignored_path("/usr/lib/python3.13/os.py")
+
+    def test_system_prefix_usr_local(self):
+        assert _is_ignored_path("/usr/local/lib/python3.13/site-packages/pkg/mod.py")
+
+    def test_system_prefix_homebrew(self):
+        assert _is_ignored_path("/opt/homebrew/lib/python3.13/site-packages/pkg.py")
+
+    def test_system_prefix_macos_framework(self):
+        assert _is_ignored_path("/Library/Frameworks/Python.framework/Versions/3.13/lib/os.py")
+
     def test_normal_path(self):
         assert not _is_ignored_path("/project/src/main.py")
 
