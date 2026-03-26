@@ -399,20 +399,29 @@ class PythonCompletionProvider:
 
         module_path, original_name = module_info
         module_text = self._read_module_text(module_path, file_path)
-        if not module_text:
-            return None
 
-        m_source, m_tree = _parse(module_text, "python")
-        if m_tree:
-            sig = py_find_method_signature(m_source, m_tree, original_name, method_name)
-            if sig:
-                return sig
-            # Follow re-exports
-            sub_text = self._follow_reexport_ts(m_source, m_tree, original_name, module_path, file_path)
-            if sub_text:
-                s_source, s_tree = _parse(sub_text, "python")
+        if module_text:
+            m_source, m_tree = _parse(module_text, "python")
+            if m_tree:
+                sig = py_find_method_signature(m_source, m_tree, original_name, method_name)
+                if sig:
+                    return sig
+                # Follow re-exports
+                sub_text = self._follow_reexport_ts(m_source, m_tree, original_name, module_path, file_path)
+                if sub_text:
+                    s_source, s_tree = _parse(sub_text, "python")
+                    if s_tree:
+                        sig = py_find_method_signature(s_source, s_tree, original_name, method_name)
+                        if sig:
+                            return sig
+
+        # Try treating as submodule (e.g., gi.repository.Gtk)
+        if original_name:
+            sub_module_text = self._read_module_text(f"{module_path}.{original_name}", file_path)
+            if sub_module_text:
+                s_source, s_tree = _parse(sub_module_text, "python")
                 if s_tree:
-                    sig = py_find_method_signature(s_source, s_tree, original_name, method_name)
+                    sig = py_find_method_signature(s_source, s_tree, class_name, method_name)
                     if sig:
                         return sig
         return None
@@ -593,6 +602,7 @@ class PythonCompletionProvider:
 
         Resolves module_path (e.g., 'lib.db_tables') to a .py file by walking
         up parent directories and venv site-packages, then parses it for exportable names.
+        Also scans stub-package directories for available submodules.
         """
         if not file_path or not module_path:
             return []
@@ -601,6 +611,30 @@ class PythonCompletionProvider:
         py_file = self._find_module_file(rel_path, file_path)
         if py_file:
             return self._parse_symbols(py_file)
+
+        # If no module file found, scan for submodules in stub directories
+        # (e.g., gi.repository → gi-stubs/repository/*.pyi)
+        parts = rel_path.split("/")
+        if parts:
+            for sp in self._find_venv_site_packages(file_path):
+                stub_dir = sp / f"{parts[0]}-stubs"
+                if stub_dir.is_dir():
+                    sub_dir = stub_dir / "/".join(parts[1:]) if len(parts) > 1 else stub_dir
+                    if sub_dir.is_dir():
+                        symbols = []
+                        try:
+                            for entry in sub_dir.iterdir():
+                                name = entry.name
+                                if name.startswith("_") or name == "__pycache__":
+                                    continue
+                                if entry.is_file() and name.endswith(".pyi"):
+                                    symbols.append(CompletionItem(name[:-4], CompletionKind.CLASS))
+                                elif entry.is_dir() and (entry / "__init__.pyi").is_file():
+                                    symbols.append(CompletionItem(name, CompletionKind.PROPERTY))
+                        except OSError:
+                            pass
+                        if symbols:
+                            return sorted(symbols, key=lambda x: x.name)
 
         return []
 
@@ -669,6 +703,25 @@ class PythonCompletionProvider:
 
         module_path, original_name = module_info
         module_text = self._read_module_text(module_path, file_path)
+
+        # If the module itself can't be found, try treating the imported name
+        # as a submodule (e.g., ``from gi.repository import Gtk`` where Gtk is
+        # a submodule, not a symbol in gi/repository/__init__.py).
+        if not module_text and original_name:
+            sub_module_text = self._read_module_text(f"{module_path}.{original_name}", file_path)
+            if sub_module_text:
+                s_source, s_tree = _parse(sub_module_text, "python")
+                if s_tree:
+                    if len(parts) == 1:
+                        result = py_extract_file_symbols(s_source, s_tree)
+                        if isinstance(result, tuple):
+                            symbols, _ = result
+                            return sorted(symbols.values(), key=lambda x: x.name)
+                        return result
+                    else:
+                        return py_resolve_chain(s_source, s_tree, parts[1:])
+            return []
+
         if not module_text:
             return []
 
@@ -693,6 +746,20 @@ class PythonCompletionProvider:
         result = py_resolve_chain(m_source, m_tree, chain)
         if result:
             return result
+
+        # Try treating as submodule when resolution within module fails
+        sub_module_text = self._read_module_text(f"{module_path}.{original_name}", file_path)
+        if sub_module_text:
+            s_source, s_tree = _parse(sub_module_text, "python")
+            if s_tree:
+                if len(parts) == 1:
+                    result = py_extract_file_symbols(s_source, s_tree)
+                    if isinstance(result, tuple):
+                        symbols, _ = result
+                        return sorted(symbols.values(), key=lambda x: x.name)
+                    return result
+                else:
+                    return py_resolve_chain(s_source, s_tree, parts[1:])
 
         # Follow re-exports
         sub_text = self._follow_reexport_ts(m_source, m_tree, original_name, module_path, file_path)
@@ -741,23 +808,27 @@ class PythonCompletionProvider:
                 break
             current = current.parent
 
-        # Also search venv site-packages
+        # Also search venv site-packages (including stub packages)
         if rel_path:
+            rel_parts = rel_path.split("/")
             for sp in self._find_venv_site_packages(file_path):
-                dir_path = sp / rel_path
-                if not dir_path.is_dir():
-                    continue
-                try:
-                    for entry in dir_path.iterdir():
-                        name = entry.name
-                        if name.startswith(".") or name == "__pycache__":
-                            continue
-                        if entry.is_dir():
-                            modules.add(name)
-                        elif entry.is_file() and name.endswith(".py") and name != "__init__.py":
-                            modules.add(name[:-3])
-                except OSError:
-                    pass
+                for search_dir in [sp / rel_path, sp / f"{rel_parts[0]}-stubs" / "/".join(rel_parts[1:])]:
+                    if not search_dir.is_dir():
+                        continue
+                    try:
+                        for entry in search_dir.iterdir():
+                            name = entry.name
+                            if name.startswith(".") or name.startswith("_") or name == "__pycache__":
+                                continue
+                            if entry.is_dir():
+                                modules.add(name)
+                            elif entry.is_file():
+                                if name.endswith(".py") and name != "__init__.py":
+                                    modules.add(name[:-3])
+                                elif name.endswith(".pyi") and name != "__init__.pyi":
+                                    modules.add(name[:-4])
+                    except OSError:
+                        pass
 
         return sorted([CompletionItem(m, CompletionKind.PROPERTY) for m in modules], key=lambda x: x.name)
 
@@ -905,8 +976,35 @@ class PythonCompletionProvider:
             cls._stdlib_path_resolved = True
         return cls._stdlib_path
 
+    @staticmethod
+    def _check_module_candidates(base_dir, rel_path):
+        """Check for .py, .pyi, and stub-package variants of a module path under base_dir."""
+        for ext in (".py", ".pyi"):
+            candidate = base_dir / f"{rel_path}{ext}"
+            if candidate.is_file():
+                return candidate
+        for init in ("__init__.py", "__init__.pyi"):
+            candidate = base_dir / rel_path / init
+            if candidate.is_file():
+                return candidate
+        # Check <pkg>-stubs directories (PEP 561 stub-only packages)
+        parts = Path(rel_path).parts
+        if parts:
+            stub_dir = base_dir / f"{parts[0]}-stubs"
+            if stub_dir.is_dir():
+                stub_rel = Path(*parts[1:]) if len(parts) > 1 else Path()
+                for ext in (".py", ".pyi"):
+                    candidate = stub_dir / f"{stub_rel}{ext}" if str(stub_rel) != "." else stub_dir / f"__init__{ext}"
+                    if candidate.is_file():
+                        return candidate
+                for init in ("__init__.py", "__init__.pyi"):
+                    candidate = stub_dir / stub_rel / init
+                    if candidate.is_file():
+                        return candidate
+        return None
+
     def _find_module_file(self, rel_path, file_path):
-        """Find the .py file for a module, searching project dirs, venv, then stdlib."""
+        """Find the .py/.pyi file for a module, searching project dirs, venv, stubs, then stdlib."""
         current = Path(file_path).parent
         searched = set()
         while current != current.parent:
@@ -914,29 +1012,23 @@ class PythonCompletionProvider:
                 if root in searched or not root.is_dir():
                     continue
                 searched.add(root)
-                py_file = root / f"{rel_path}.py"
-                if not py_file.is_file():
-                    py_file = root / rel_path / "__init__.py"
-                if py_file.is_file():
-                    return py_file
+                result = self._check_module_candidates(root, rel_path)
+                if result:
+                    return result
             if (current / ".git").exists():
                 break
             current = current.parent
         # Fallback: search venv site-packages
         for sp in self._find_venv_site_packages(file_path):
-            py_file = sp / f"{rel_path}.py"
-            if not py_file.is_file():
-                py_file = sp / rel_path / "__init__.py"
-            if py_file.is_file():
-                return py_file
+            result = self._check_module_candidates(sp, rel_path)
+            if result:
+                return result
         # Fallback: search Python stdlib
         stdlib_dir = self._get_stdlib_path()
         if stdlib_dir:
-            py_file = stdlib_dir / f"{rel_path}.py"
-            if not py_file.is_file():
-                py_file = stdlib_dir / rel_path / "__init__.py"
-            if py_file.is_file():
-                return py_file
+            result = self._check_module_candidates(stdlib_dir, rel_path)
+            if result:
+                return result
         return None
 
     def _read_module_text(self, module_path, file_path):

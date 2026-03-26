@@ -436,8 +436,9 @@ class Autocomplete:
                 if call_params:
                     self._completions = call_params
             # Only fall back to generic completions if NOT in a dot-access context;
-            # unresolvable dot targets (e.g., "handle.") should show nothing.
-            if not self._completions and not dot_context:
+            # unresolvable dot targets (e.g., "handle.") should show nothing —
+            # unless the user explicitly forced completions via Ctrl+Space.
+            if not self._completions and (not dot_context or force):
                 self._completions = self._get_completions(file_path)
 
         if not self._completions:

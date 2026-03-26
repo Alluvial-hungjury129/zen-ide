@@ -649,8 +649,9 @@ class GlobalSearchDialog(NvimPopup):
             if result.file_path != current_file:
                 current_file = result.file_path
                 file_row = Gtk.ListBoxRow()
-                file_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-                file_box.set_margin_top(8 if current_file != results[0].file_path else 0)
+                file_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+                file_box.set_margin_top(8)
+                file_box.set_margin_start(8)
 
                 # File icon (file-type-specific)
                 icon_char, icon_color = get_file_icon(result.file_path)
@@ -659,10 +660,19 @@ class GlobalSearchDialog(NvimPopup):
                 icon_label.set_markup(f'<span foreground="{icon_color}">{icon_char}</span>')
                 file_box.append(icon_label)
 
+                file_name_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
                 file_label = Gtk.Label(label=os.path.basename(result.file_path))
                 file_label.set_halign(Gtk.Align.START)
                 file_label.add_css_class("nvim-popup-title")
-                file_box.append(file_label)
+                file_name_box.append(file_label)
+
+                path_label = Gtk.Label(label=os.path.dirname(result.file_path))
+                path_label.set_halign(Gtk.Align.START)
+                path_label.set_ellipsize(Pango.EllipsizeMode.START)
+                path_label.add_css_class("nvim-popup-list-item-hint")
+                file_name_box.append(path_label)
+
+                file_box.append(file_name_box)
 
                 file_row.set_child(file_box)
                 file_row.set_activatable(False)

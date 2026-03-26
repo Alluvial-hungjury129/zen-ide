@@ -61,7 +61,7 @@ class ClaudeCLI(CLIProvider):
             argv.append("--continue")
         if yolo:
             argv.append("--dangerously-skip-permissions")
-        if model:
+        if model and model in self._fetch_models_impl(binary):
             argv.extend(["--model", model])
         for d in extra_dirs or []:
             argv.extend(["--add-dir", d])

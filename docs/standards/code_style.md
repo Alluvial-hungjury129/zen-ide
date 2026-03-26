@@ -1,7 +1,7 @@
 # Code Style
 
 **Created_at:** 2026-01-16  
-**Updated_at:** 2026-03-12  
+**Updated_at:** 2026-03-26
 **Status:** Active  
 **Goal:** Define naming conventions and file structure rules for all source code  
 **Scope:** All files in `src/`  
@@ -20,6 +20,15 @@ Each class should be in its own standalone file — no nested or multiple classe
   - `git_ignore_utils.py` → `GitIgnoreUtils`
   - `diff_view.py` → `DiffView`
 - When renaming a file, rename the class to match (and vice versa)
+
+## File Length Limit
+
+No single file should exceed **500 lines**. When a file grows beyond this limit,
+split it by responsibility into a package or sibling modules. Use `__init__.py`
+re-exports to preserve the public API.
+
+See [`docs/2026_03_26_500_line_limit_plan.md`](../2026_03_26_500_line_limit_plan.md)
+for the full reorganisation plan covering existing files that exceed this limit.
 
 ## Function Locality
 
