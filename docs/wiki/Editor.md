@@ -60,9 +60,33 @@ A code overview on the right side of the editor showing a miniature rendering of
 
 Toggle via settings: `editor.show_minimap`
 
+## Code Folding
+
+Collapse multi-line blocks (functions, classes, loops, objects, etc.) to a single header line. Fold regions are detected automatically using tree-sitter for Python, JavaScript, TypeScript, and TSX, and brace/bracket matching for JSON and other languages.
+
+**Fold chevrons** appear in the line number gutter on hover:
+- Click a **down chevron** (▾) to collapse a block
+- Click a **right chevron** (▸) to expand it — collapsed chevrons are always visible
+- Chevrons fade in/out on gutter hover (~200ms animation)
+
+**Behaviour:**
+- Folded content is completely hidden — the header line remains visible
+- If the cursor is inside a collapsed region (e.g. via find or go-to-line), the fold auto-expands
+- Collapsed state is preserved across edits (matched by proximity within ±2 lines)
+- Fold regions recompute on buffer change (500ms debounce)
+
+**Supported languages:**
+
+| Detection | Languages |
+|---|---|
+| Tree-sitter AST | Python, JavaScript, TypeScript, TSX |
+| Brace/bracket matching | JSON and all other languages |
+
+Fold chevron visibility is controlled by `editor.show_line_numbers` — when line numbers are hidden, fold chevrons are also hidden.
+
 ## Line Numbers
 
-Shown by default in the left gutter. Toggle via settings: `editor.show_line_numbers`
+Shown by default in the left gutter. Also controls fold chevron visibility. Toggle via settings: `editor.show_line_numbers`
 
 ## Gutter Diff Indicators
 

@@ -21,7 +21,7 @@ All settings are stored in `~/.zen_ide/settings.json`. Edit this file directly o
 |---|---|---|---|---|
 | `editor.tab_size` | `4` | int | ⚙️ | Spaces per tab stop |
 | `editor.insert_spaces` | `true` | bool | ⚙️ | Spaces instead of tabs |
-| `editor.show_line_numbers` | `true` | bool | ⚙️ | Line number gutter |
+| `editor.show_line_numbers` | `true` | bool | ⚙️ | Line number gutter + fold chevrons |
 | `editor.highlight_current_line` | `true` | bool | ⚙️ | Highlight cursor line |
 | `editor.word_wrap` | `false` | bool | ⚙️ | Wrap long lines |
 | `editor.letter_spacing` | `0.3` / `0` | float | ⚙️ | Extra letter spacing (px). macOS=0.3, Linux=0 |
