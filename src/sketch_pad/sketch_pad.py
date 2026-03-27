@@ -10,8 +10,8 @@ from gi.repository import Gdk, Gio, GLib, Gtk
 from constants import SKETCH_TOOL_BTN_SIZE, SKETCH_TOOL_ICON_SIZE
 from fonts.font_manager import get_font_settings
 from icons import Icons, get_icon_font_name
+from sketch_pad.canvas import SketchCanvas
 from sketch_pad.global_settings_popup import GlobalDiagramSettingsPopup
-from sketch_pad.sketch_canvas import SketchCanvas
 from sketch_pad.sketch_model import ArrowLineStyle, ArrowShape, Board, ToolMode
 from themes import ThemeAwareMixin
 

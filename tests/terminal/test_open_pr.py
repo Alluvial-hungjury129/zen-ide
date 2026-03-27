@@ -107,7 +107,14 @@ class TestPreflightChecks:
                 "GIT_COMMITTER_EMAIL": "t@t.com",
             },
         )
+        # Create a fake gh so the script gets past the prerequisite check
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        fake_gh = fake_bin / "gh"
+        fake_gh.write_text("#!/usr/bin/env bash\nexit 0\n")
+        fake_gh.chmod(0o755)
         env = os.environ.copy()
+        env["PATH"] = f"{fake_bin}:{env['PATH']}"
         env["GIT_DIR"] = str(repo / ".git")
         env["GIT_WORK_TREE"] = str(repo)
         result = _run(env_overrides=env)

@@ -58,7 +58,7 @@ class TestSystemSelectionDialogStructure:
     """Verify SystemSelectionDialog structural contracts."""
 
     def test_inherits_gtk_popover(self):
-        tree = parse_popup_source("system_dialogs.py")
+        tree = parse_popup_source("recent_items.py")
         cls = find_class(tree, "SystemSelectionDialog")
         assert cls is not None
         found = False
@@ -70,12 +70,12 @@ class TestSystemSelectionDialogStructure:
         assert found
 
     def test_has_present(self):
-        tree = parse_popup_source("system_dialogs.py")
+        tree = parse_popup_source("recent_items.py")
         cls = find_class(tree, "SystemSelectionDialog")
         assert find_method(cls, "present") is not None
 
     def test_handles_disabled_items(self):
-        source = read_popup_source("system_dialogs.py")
+        source = read_popup_source("recent_items.py")
         assert "disabled" in source
 
 
@@ -108,24 +108,24 @@ class TestSystemContextMenuStructure:
     """Verify SystemContextMenu structural contracts."""
 
     def test_inherits_gtk_popover(self):
-        tree = parse_popup_source("system_dialogs.py")
+        tree = parse_popup_source("path_breadcrumb.py")
         cls = find_class(tree, "SystemContextMenu")
         assert cls is not None
 
     def test_has_move_selection(self):
-        tree = parse_popup_source("system_dialogs.py")
+        tree = parse_popup_source("path_breadcrumb.py")
         cls = find_class(tree, "SystemContextMenu")
         assert find_method(cls, "_move_selection") is not None
 
     def test_move_selection_uses_modulo(self):
-        tree = parse_popup_source("system_dialogs.py")
+        tree = parse_popup_source("path_breadcrumb.py")
         cls = find_class(tree, "SystemContextMenu")
         method = find_method(cls, "_move_selection")
         assert method_uses_modulo(method)
 
     def test_move_selection_has_loop(self):
         """_move_selection must loop to skip separators/disabled."""
-        tree = parse_popup_source("system_dialogs.py")
+        tree = parse_popup_source("path_breadcrumb.py")
         cls = find_class(tree, "SystemContextMenu")
         method = find_method(cls, "_move_selection")
         has_loop = any(isinstance(child, (ast.For, ast.While)) for child in ast.walk(method))

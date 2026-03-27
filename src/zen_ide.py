@@ -21,188 +21,31 @@ _parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _parent_dir not in sys.path:
     sys.path.insert(0, _parent_dir)
 
-_STARTUP_HOUSEKEEPING_DONE = False
+# Import preloading infrastructure — starts background threads for AppKit,
+# workspace I/O, and font registration at import time.
+import threading  # noqa: E402
 
-# Preload macOS AppKit in background thread for instant foreground activation
-# at first paint. The import takes ~200ms but runs concurrently with GTK init,
-# so it's ready well before the window maps.
-# In frozen bundles, AppKit is already loaded by the runtime hook splash window.
-_macos_appkit_loaded = None
+import app_preload as _ap  # noqa: E402
 
-import threading
-
-if sys.platform == "darwin":
-    if os.environ.get("_ZEN_APPKIT_PRELOADED"):
-        # AppKit already imported by runtime hook splash — mark as ready
-        _macos_appkit_loaded = threading.Event()
-        _macos_appkit_loaded.set()
-    else:
-        _macos_appkit_loaded = threading.Event()
-
-        def _preload_appkit():
-            try:
-                import AppKit  # noqa: F401 — ~200ms, cached for later use
-            except Exception:
-                pass
-            _macos_appkit_loaded.set()
-
-        threading.Thread(target=_preload_appkit, daemon=True).start()
-
-# Preload workspace I/O in background thread so it's ready by the time the
-# window maps (~61ms). Reads workspace settings, parses workspace file, and
-# collects gitignore patterns — pure I/O that completes in <10ms.
-_workspace_preload = None
-_workspace_preload_event = threading.Event()
+# Re-export mutable globals so external code (e.g. `import zen_ide;
+# zen_ide._workspace_preload`) sees live values updated by background threads.
+# Using module-level __getattr__ ensures reads always delegate to app_preload.
+_font_thread = _ap._font_thread
+_macos_appkit_loaded = _ap._macos_appkit_loaded
+_workspace_preload_event = _ap._workspace_preload_event
+_run_startup_housekeeping = _ap._run_startup_housekeeping
+_read_pango_backend = _ap._read_pango_backend
+_preload_editor_module = _ap._preload_editor_module
+_preload_treeview_module = _ap._preload_treeview_module
 
 
-def _preload_workspace_io():
-    """Preload workspace config, gitignore patterns, and treeview module in background."""
-    global _workspace_preload
-    try:
-        from shared.settings import get_workspace
-
-        workspace = get_workspace()
-        saved_ws_file = workspace.get("workspace_file", "")
-        folders = []
-        ws_name = None
-
-        if saved_ws_file and os.path.isfile(saved_ws_file):
-            import json as json_module
-            import re
-
-            with open(saved_ws_file, "r", encoding="utf-8") as f:
-                content = f.read()
-            content = re.sub(r"//[^\n]*", "", content)
-            content = re.sub(r",(\s*[}\]])", r"\1", content)
-            ws_data = json_module.loads(content)
-            ws_dir = os.path.dirname(saved_ws_file)
-            for folder in ws_data.get("folders", []):
-                folder_path = folder.get("path", "")
-                if folder_path:
-                    if not os.path.isabs(folder_path):
-                        folder_path = os.path.normpath(os.path.join(ws_dir, folder_path))
-                    if os.path.isdir(folder_path):
-                        folders.append(folder_path)
-            ws_name = os.path.basename(saved_ws_file)
-        else:
-            folders = [f for f in workspace.get("folders", []) if os.path.isdir(f)]
-            if not folders:
-                folders = [os.getcwd()]
-
-        # Collect gitignore patterns (pure I/O)
-        if folders:
-            from shared.git_ignore_utils import collect_global_patterns
-
-            collect_global_patterns(folders)
-
-        _workspace_preload = {
-            "workspace": workspace,
-            "folders": folders,
-            "ws_file": saved_ws_file,
-            "ws_name": ws_name,
-        }
-    except Exception:
-        _workspace_preload = None
-    _workspace_preload_event.set()
-
-
-threading.Thread(target=_preload_workspace_io, daemon=True).start()
-
-
-def _run_startup_housekeeping():
-    """Run startup housekeeping after first frame to keep first paint fast."""
-    global _STARTUP_HOUSEKEEPING_DONE
-    if _STARTUP_HOUSEKEEPING_DONE:
-        return False
-
-    # Deferred: crash log recovery and crash handler (not needed before first paint)
-    from shared.crash_log import collect_native_crash, install_crash_handler
-
-    collect_native_crash()
-    install_crash_handler()
-
-    # Deferred: exit tracker (imports faulthandler, signal, datetime)
-    from shared.exit_tracker import install_exit_tracker
-
-    install_exit_tracker()
-
-    # Register normal exit logging via atexit
-    import atexit
-
-    from shared.crash_log import log_exit
-
-    atexit.register(log_exit, "Normal exit")
-
-    _STARTUP_HOUSEKEEPING_DONE = True
-    return False
-
-
-# Set PANGOCAIRO_BACKEND before GTK/Pango initializes, if configured.
-# Must read settings.json directly — the settings module isn't loaded yet.
-def _read_pango_backend():
-    """Read font_rendering.pango_backend from settings.json (pre-GTK)."""
-    settings_file = os.path.join(os.path.expanduser("~"), ".zen_ide", "settings.json")
-    if not os.path.exists(settings_file):
-        return "auto"
-    try:
-        import json as _json
-
-        with open(settings_file, "r") as f:
-            data = _json.load(f)
-        return data.get("font_rendering", {}).get("pango_backend", "auto")
-    except Exception:
-        return "auto"
-
-
-# Register resource fonts with fontconfig BEFORE GTK/Pango initializes,
-# so the first Pango font map enumeration includes them (avoids expensive
-# refresh/swap on the critical path — saves ~24ms).
-# Fonts are loaded from binary .ttf files on disk (no Python module import overhead).
-def _register_fonts_early():
-    """Register bundled .ttf files with fontconfig before GTK starts.
-
-    Fontconfig app-font state survives Gtk.init() on all platforms, so fonts
-    are visible in Pango's first font map enumeration without needing a
-    post-init changed()/swap cycle.  Runs in a background thread (~11ms of
-    ctypes FFI, concurrent with gi_requirements + GTK C library loading).
-    """
-    global _fonts_preregistered
-
-    import ctypes
-    import ctypes.util
-
-    fonts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "resources")
-    font_files = (
-        [os.path.join(fonts_dir, f) for f in os.listdir(fonts_dir) if f.endswith(".ttf")] if os.path.isdir(fonts_dir) else []
-    )
-
-    if not font_files:
-        return
-
-    try:
-        fc_lib = ctypes.util.find_library("fontconfig")
-        if not fc_lib:
-            return
-
-        fc = ctypes.cdll.LoadLibrary(fc_lib)
-        fc.FcConfigAppFontAddFile.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
-        fc.FcConfigAppFontAddFile.restype = ctypes.c_int
-        registered_any = False
-        for font_file in font_files:
-            ok = fc.FcConfigAppFontAddFile(None, font_file.encode("utf-8"))
-            if ok:
-                registered_any = True
-        _fonts_preregistered = registered_any
-    except Exception:
-        pass
-
-
-# Run font registration in a background thread — ctypes FFI calls release the
-# GIL, so the ~11ms of fontconfig work runs concurrently with gi_requirements +
-# GTK C library loading (~274ms).  Joined before Gtk.init().
-_fonts_preregistered = False
-_font_thread = threading.Thread(target=_register_fonts_early, daemon=True)
-_font_thread.start()
+def __getattr__(name):
+    """Delegate lookups for mutable globals to app_preload at access time."""
+    if name == "_workspace_preload":
+        return _ap._workspace_preload
+    if name == "_fonts_preregistered":
+        return _ap._fonts_preregistered
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # Apply PANGOCAIRO_BACKEND setting before GTK/Pango initializes.
@@ -229,7 +72,7 @@ except ValueError as e:
     print("  pip install PyGObject")
     sys.exit(1)
 
-from gi.repository import Gdk, Gio, GLib, Gtk
+from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
 # Set prgname BEFORE Gtk.init() so that the X11 WM_CLASS and Wayland app_id
 # match the StartupWMClass in zen-ide.desktop.  Without this, the desktop
@@ -301,28 +144,17 @@ Gtk.init()
 # Pre-import shared.ui on the main thread so both preload threads don't race
 # for its module lock (Python's import machinery is not re-entrant and two
 # threads importing the same transitive dependency causes a _DeadlockError).
-import shared.ui  # noqa: F401
-
-
-def _preload_editor_module():
-    import editor.editor_view  # noqa: F401
-    import editor.split_panel_manager  # noqa: F401
-    import fonts  # noqa: F401
-
-
-def _preload_treeview_module():
-    import treeview  # noqa: F401
-
+import shared.ui  # noqa: F401, E402
 
 _preload_editor_thread = threading.Thread(target=_preload_editor_module, daemon=True)
 _preload_treeview_thread = threading.Thread(target=_preload_treeview_module, daemon=True)
 _preload_editor_thread.start()
 _preload_treeview_thread.start()
 
-from shared.settings import get_setting, load_settings
+from shared.settings import get_setting, load_settings  # noqa: E402
 
 load_settings()
-from themes import set_theme
+from themes import set_theme  # noqa: E402
 
 # persist=False — we're restoring the saved theme, no need to write it back to disk (~15ms saved)
 _saved_theme = get_setting("theme", "zen_dark")
@@ -360,15 +192,15 @@ if _settings:
     # Snap glyph metrics to pixel grid — works on all platforms.
     _settings.set_property("gtk-hint-font-metrics", _fr.get("hint_font_metrics", True))
 
-from constants import DEFAULT_FONT_SIZE, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
-from main.action_manager import ActionManager
-from main.window_actions import WindowActionsMixin
-from main.window_events import WindowEventsMixin
-from main.window_fonts import WindowFontsMixin
-from main.window_layout import WindowLayoutMixin
-from main.window_panels import WindowPanelsMixin
-from main.window_state import WindowStateMixin
-from shared.settings import get_layout
+from constants import DEFAULT_FONT_SIZE, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH  # noqa: E402
+from main.action_manager import ActionManager  # noqa: E402
+from main.window_actions import WindowActionsMixin  # noqa: E402
+from main.window_events import WindowEventsMixin  # noqa: E402
+from main.window_fonts import WindowFontsMixin  # noqa: E402
+from main.window_layout import WindowLayoutMixin  # noqa: E402
+from main.window_panels import WindowPanelsMixin  # noqa: E402
+from main.window_state import WindowStateMixin  # noqa: E402
+from shared.settings import get_layout  # noqa: E402
 
 # Join preload threads — they ran concurrently with settings/theme/mixin work above.
 _preload_editor_thread.join()
@@ -596,274 +428,8 @@ class ZenIDEWindow(
         return False
 
 
-class ZenIDEApp(Gtk.Application):
-    """GTK4 Application for Zen IDE."""
-
-    def __init__(self):
-        super().__init__(
-            application_id="com.zenide.app",
-            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE | Gio.ApplicationFlags.HANDLES_OPEN,
-        )
-        self._pending_workspace = None
-        self._pending_file = None
-        self._pending_new_file = None
-        self._pending_dir = None
-        self._icon_paintable = None
-
-        # On Linux, install the icon and set default icon name BEFORE any
-        # window is created.  The window manager reads the icon at window
-        # creation time — doing it later in a deferred callback is too late.
-        if sys.platform == "linux":
-            self._setup_app_icon_early()
-
-    def _setup_app_icon_early(self):
-        """Install the app icon into the icon theme BEFORE any window is created.
-
-        On Linux, the window manager reads the icon at window-creation time
-        via _NET_WM_ICON (X11) or the xdg-icon-theme (Wayland).  If the
-        icon isn't installed and ``set_default_icon_name`` hasn't been called
-        yet, the WM falls back to a generic icon and won't update it later.
-
-        This method:
-        1. Copies zen_icon.png into ~/.local/share/icons/hicolor/ at multiple
-           standard sizes (48, 64, 128, 256) so icon lookups at any DPI work.
-        2. Also installs into /usr/share/pixmaps/ as a universal fallback
-           (some older DEs/WMs check pixmaps before the icon theme).
-        3. Calls Gtk.Window.set_default_icon_name("zen-ide") so every
-           GtkWindow created afterwards gets the correct _NET_WM_ICON.
-        4. Installs the .desktop file for the current user.
-        """
-        src_dir = os.path.dirname(os.path.abspath(__file__))
-        repo_root = os.path.dirname(src_dir)
-        icon_path = os.path.join(repo_root, "zen_icon.png")
-
-        if not os.path.exists(icon_path):
-            return
-
-        try:
-            import shutil
-
-            # Install icon at multiple sizes in the user's hicolor theme.
-            # Many DEs (Cinnamon, KDE, XFCE) require the icon in the hicolor
-            # theme hierarchy — /usr/share/pixmaps alone isn't always enough.
-            for size in (48, 64, 128, 256):
-                icon_dir = os.path.expanduser(f"~/.local/share/icons/hicolor/{size}x{size}/apps")
-                os.makedirs(icon_dir, exist_ok=True)
-                dest = os.path.join(icon_dir, "zen-ide.png")
-                if not os.path.exists(dest) or os.path.getmtime(icon_path) > os.path.getmtime(dest):
-                    shutil.copy2(icon_path, dest)
-
-            # Also install a scalable/symbolic copy at the base apps/ level
-            # (some compositors look here for SVG/PNG fallback)
-            base_dir = os.path.expanduser("~/.local/share/icons/hicolor/scalable/apps")
-            os.makedirs(base_dir, exist_ok=True)
-            base_dest = os.path.join(base_dir, "zen-ide.png")
-            if not os.path.exists(base_dest) or os.path.getmtime(icon_path) > os.path.getmtime(base_dest):
-                shutil.copy2(icon_path, base_dest)
-
-            # Install into ~/.local/share/pixmaps as a universal fallback
-            pixmaps_dir = os.path.expanduser("~/.local/share/pixmaps")
-            os.makedirs(pixmaps_dir, exist_ok=True)
-            pixmaps_dest = os.path.join(pixmaps_dir, "zen-ide.png")
-            if not os.path.exists(pixmaps_dest) or os.path.getmtime(icon_path) > os.path.getmtime(pixmaps_dest):
-                shutil.copy2(icon_path, pixmaps_dest)
-
-            # Install the .desktop file for the current user
-            desktop_src = os.path.join(repo_root, "zen-ide.desktop")
-            if os.path.exists(desktop_src):
-                desktop_dir = os.path.expanduser("~/.local/share/applications")
-                os.makedirs(desktop_dir, exist_ok=True)
-                desktop_dest = os.path.join(desktop_dir, "zen-ide.desktop")
-                if not os.path.exists(desktop_dest) or os.path.getmtime(desktop_src) > os.path.getmtime(desktop_dest):
-                    shutil.copy2(desktop_src, desktop_dest)
-
-            # Update the icon theme cache so the DE picks up the new icon
-            # immediately (without requiring a logout).  Errors are silenced —
-            # the cache will be rebuilt on next login anyway.
-            try:
-                import subprocess
-
-                hicolor_dir = os.path.expanduser("~/.local/share/icons/hicolor")
-                subprocess.Popen(
-                    ["gtk-update-icon-cache", "-f", "-t", hicolor_dir],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            except FileNotFoundError:
-                pass  # gtk-update-icon-cache not installed
-
-        except Exception:
-            pass  # Non-fatal — worst case the generic icon is shown
-
-        # Tell GTK4 that every window should use this icon.  This must be
-        # called BEFORE any Gtk.Window is instantiated — it sets the
-        # _NET_WM_ICON property on X11 and the app_id icon on Wayland.
-        Gtk.Window.set_default_icon_name("zen-ide")
-
-    def _setup_app_icon(self):
-        """Set the application icon from zen_icon.png (deferred call for texture + macOS)."""
-        # Look for icon relative to this file's location
-        src_dir = os.path.dirname(os.path.abspath(__file__))
-        repo_root = os.path.dirname(src_dir)
-
-        # Use zen_icon.png
-        icon_path = os.path.join(repo_root, "zen_icon.png")
-
-        # Load the icon as texture for direct use (About dialog, etc.)
-        if os.path.exists(icon_path):
-            try:
-                self._icon_paintable = Gdk.Texture.new_from_filename(icon_path)
-            except Exception:
-                pass
-
-        # Defer macOS dock icon (AppKit import is ~120ms — do it after first paint)
-        if sys.platform == "darwin":
-            GLib.idle_add(self._set_macos_dock_icon, icon_path)
-
-    def _set_macos_dock_icon(self, icon_path):
-        """Set the dock icon on macOS using AppKit and bring app to foreground."""
-        try:
-            from AppKit import NSApplication, NSImage
-
-            ns_app = NSApplication.sharedApplication()
-            # Bring the app to foreground on startup
-            ns_app.activateIgnoringOtherApps_(True)
-
-            if os.path.exists(icon_path):
-                image = NSImage.alloc().initWithContentsOfFile_(icon_path)
-                if image:
-                    ns_app.setApplicationIconImage_(image)
-        except ImportError:
-            pass  # pyobjc not installed
-        except Exception:
-            pass
-        return False  # Don't repeat (GLib.idle_add)
-
-    def get_icon_paintable(self):
-        """Get the app icon as a paintable for windows."""
-        return self._icon_paintable
-
-    def do_command_line(self, command_line):
-        """Handle command line arguments."""
-        args = command_line.get_arguments()
-        if len(args) > 1:
-            path = os.path.abspath(args[1])
-            if path.endswith((".zen-workspace", ".code-workspace")) and os.path.isfile(path):
-                self._pending_workspace = path
-            elif os.path.isdir(path):
-                self._pending_dir = path
-            elif os.path.isfile(path):
-                self._pending_file = path
-            else:
-                # File doesn't exist — open as a new unsaved file with that name
-                self._pending_new_file = path
-        self.activate()
-        return 0
-
-    def do_open(self, files, n_files, hint):
-        """Handle files opened via macOS 'Open With' or drag-and-drop."""
-        for gfile in files:
-            path = gfile.get_path()
-            if path and os.path.isfile(path):
-                self._pending_file = os.path.abspath(path)
-                break
-        self.activate()
-
-    def do_activate(self):
-        """Called when the application is activated.
-
-        Two distinct paths:
-        1. **First launch** — no window exists: create ZenIDEWindow, set CLI
-           hints (``_cli_file``, etc.) that ``_on_window_mapped`` consumes,
-           and defer file opening until the editor is realized.
-        2. **Re-activation** — window already exists (second ``zen file.py``
-           via D-Bus): open the file/workspace/dir directly in the running
-           window without touching panel visibility.
-        """
-        win = self.props.active_window
-        is_first_launch = win is None
-
-        if is_first_launch:
-            # Heavy modules (editor, treeview, fonts) already preloaded by
-            # background threads at module level — no imports needed here.
-
-            # Start timing from our code (excludes GTK framework overhead in app.run())
-            global _STARTUP_TIME
-            _STARTUP_TIME = time.monotonic()
-            win = ZenIDEWindow(self)
-
-            # Set CLI arguments BEFORE present() — present() triggers the "map"
-            # signal which runs _init_workspace synchronously, so these must be
-            # available by then.
-            if self._pending_file:
-                win._cli_file = self._pending_file
-                win.tree_view.set_visible(False)
-                win.bottom_paned.set_visible(False)
-
-            if self._pending_new_file:
-                win._cli_new_file = self._pending_new_file
-                win.tree_view.set_visible(False)
-                win.bottom_paned.set_visible(False)
-
-            if self._pending_workspace:
-                win._cli_workspace = self._pending_workspace
-                self._pending_workspace = None
-
-            if self._pending_dir:
-                win._cli_dir = self._pending_dir
-                self._pending_dir = None
-
-            win.present()
-
-            # Defer main thread poll and housekeeping to after first paint
-            from shared.main_thread import start_main_thread_poll
-
-            start_main_thread_poll()
-            GLib.idle_add(_run_startup_housekeeping)
-
-            # Open single file after present (editor needs to be mapped first)
-            if self._pending_file:
-                path = self._pending_file
-                self._pending_file = None
-                GLib.idle_add(lambda: win.editor_view.open_file(path) and False)
-
-            # Create new file tab for non-existent file path from CLI
-            if self._pending_new_file:
-                path = self._pending_new_file
-                self._pending_new_file = None
-                GLib.idle_add(lambda: win.editor_view.open_or_create_file(path) and False)
-        else:
-            # Re-activation: open pending items in the existing window.
-            if self._pending_file:
-                path = self._pending_file
-                self._pending_file = None
-                win.editor_view.open_file(path)
-
-            if self._pending_new_file:
-                path = self._pending_new_file
-                self._pending_new_file = None
-                win.editor_view.open_or_create_file(path)
-
-            if self._pending_workspace:
-                ws = self._pending_workspace
-                self._pending_workspace = None
-                win._load_workspace_file(ws)
-
-            if self._pending_dir:
-                d = self._pending_dir
-                self._pending_dir = None
-                from shared.git_ignore_utils import collect_global_patterns
-                from shared.settings import set_setting
-
-                collect_global_patterns([d])
-                win.tree_view.load_workspace([d])
-                win.set_title(f"Zen IDE — {os.path.basename(d)}")
-                set_setting("workspace.workspace_file", "")
-                set_setting("workspace.folders", [d])
-                win._show_all_panels()
-
-            # Raise the existing window to the foreground
-            win.present()
+# Import ZenIDEApp from extracted module
+from app_modules import ZenIDEApp  # noqa: E402, F401
 
 
 def main():

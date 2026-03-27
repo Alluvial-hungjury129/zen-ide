@@ -123,6 +123,26 @@ Toggle this behaviour: `behavior.terminal_follow_file` (default: `true`)
 
 Default scrollback buffer: **10,000 lines**. Configure with `terminal.scrollback_lines`.
 
+## Built-in Tools
+
+### `open_pr` — Create a PR from Terminal
+
+The `open_pr` command creates a GitHub pull request with an AI-generated title and description based on the current branch's changes.
+
+**Requirements:**
+- [GitHub CLI (`gh`)](https://cli.github.com) — must be installed and authenticated (`gh auth login`)
+- Optionally, `claude` or `copilot` CLI for AI-generated descriptions (falls back to commit log)
+
+**Usage:**
+
+```bash
+open_pr              # Create PR for current branch → main
+open_pr -b develop   # Create PR against a custom base branch
+open_pr -h           # Show help
+```
+
+The script checks that you're not on the base branch, collects the diff, and uses an available AI CLI to generate a meaningful PR description. If no AI CLI is found, it uses the commit log as the body.
+
 ## Settings
 
 | Setting | Default | Description |

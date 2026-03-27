@@ -3,16 +3,13 @@ CustomTreePanel — core tree panel with GtkSnapshot drawing, scrolling, and dat
 Composes behavior from renderer, drag, inline-edit, and keyboard mixins.
 """
 
-import os
 import sys
-from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
 
 from gi.repository import Gdk, GLib, Gtk, Pango
 
 from fonts import get_font_settings
 from icons import Icons, get_icon_font_name
-from shared.git_ignore_utils import get_global_patterns, get_matcher, get_workspace_patterns
 from shared.settings import get_setting
 from shared.utils import hex_to_rgba
 from themes import (
@@ -28,10 +25,12 @@ from treeview.tree_icons import (
     get_icon_set,
 )
 from treeview.tree_item import TreeItem
+from treeview.tree_panel_data import TreePanelDataMixin
 from treeview.tree_panel_drag import TreePanelDragMixin
 from treeview.tree_panel_inline_edit import TreePanelInlineEditMixin
 from treeview.tree_panel_keyboard import TreePanelKeyboardMixin
 from treeview.tree_panel_renderer import TreePanelRendererMixin
+from treeview.tree_panel_selection import TreePanelSelectionMixin
 
 _PRIMARY_MOD = Gdk.ModifierType.META_MASK if sys.platform == "darwin" else Gdk.ModifierType.CONTROL_MASK
 
@@ -42,6 +41,8 @@ class CustomTreePanel(
     TreePanelDragMixin,
     TreePanelInlineEditMixin,
     TreePanelKeyboardMixin,
+    TreePanelSelectionMixin,
+    TreePanelDataMixin,
     Gtk.ScrolledWindow,
 ):
     """Custom drawn tree control with neovim-style indent guides."""
@@ -393,105 +394,6 @@ class CustomTreePanel(
             return self.items[index]
         return None
 
-    def _is_item_selected(self, item: Optional[TreeItem]) -> bool:
-        """Return whether an item is part of the current selection."""
-        return item is not None and item in self.selected_items
-
-    def get_selected_items(self) -> List[TreeItem]:
-        """Return selected items in visible tree order."""
-        if not self.selected_items:
-            return []
-        return [item for item in self.items if item in self.selected_items]
-
-    def _set_selection(
-        self,
-        items: List[TreeItem],
-        primary_item: Optional[TreeItem] = None,
-        anchor_item: Optional[TreeItem] = None,
-    ):
-        """Replace the current selection."""
-        visible_items = [item for item in items if item in self.items]
-        self.selected_items = set(visible_items)
-
-        if not visible_items:
-            self.selected_item = None
-            self._selection_anchor_item = None
-            return
-
-        if primary_item not in self.selected_items:
-            primary_item = visible_items[-1]
-        self.selected_item = primary_item
-
-        if anchor_item not in self.selected_items:
-            anchor_item = primary_item
-        self._selection_anchor_item = anchor_item
-
-    def _clear_selection(self):
-        """Clear the current selection."""
-        self.selected_items.clear()
-        self.selected_item = None
-        self._selection_anchor_item = None
-
-    def _select_single_item(self, item: Optional[TreeItem]):
-        """Select a single tree item."""
-        if item is None:
-            self._clear_selection()
-            return
-        self._set_selection([item], primary_item=item, anchor_item=item)
-
-    def _toggle_item_selection(self, item: TreeItem):
-        """Toggle an item inside the current selection."""
-        if item in self.selected_items:
-            remaining_items = [selected for selected in self.get_selected_items() if selected != item]
-            if remaining_items:
-                new_primary = self.selected_item if self.selected_item != item else remaining_items[-1]
-                new_anchor = self._selection_anchor_item if self._selection_anchor_item != item else new_primary
-                self._set_selection(remaining_items, primary_item=new_primary, anchor_item=new_anchor)
-            else:
-                self._clear_selection()
-            return
-
-        items = self.get_selected_items()
-        items.append(item)
-        self._set_selection(items, primary_item=item, anchor_item=item)
-
-    def _select_range_to(self, item: TreeItem):
-        """Select an inclusive range from the anchor item to the target item."""
-        anchor = self._selection_anchor_item or self.selected_item
-        if anchor not in self.items:
-            self._select_single_item(item)
-            return
-
-        start = self.items.index(anchor)
-        end = self.items.index(item)
-        if start <= end:
-            range_items = self.items[start : end + 1]
-        else:
-            range_items = self.items[end : start + 1]
-        self._set_selection(range_items, primary_item=item, anchor_item=anchor)
-
-    def _prune_selection_to_visible_items(self):
-        """Drop any selected items that are no longer visible."""
-        if not self.selected_items:
-            self.selected_item = None
-            if self._selection_anchor_item not in self.items:
-                self._selection_anchor_item = None
-            return
-
-        visible = set(self.items)
-        self.selected_items = {item for item in self.selected_items if item in visible}
-
-        if not self.selected_items:
-            self.selected_item = None
-            self._selection_anchor_item = None
-            return
-
-        if self.selected_item not in self.selected_items:
-            self.selected_item = self.get_selected_items()[-1]
-
-        if self._selection_anchor_item not in self.selected_items:
-            self._selection_anchor_item = self.selected_item
-
     def _on_click(self, gesture, n_press, x, y):
         """Handle click."""
         vadj = self.get_vadjustment()
@@ -581,153 +483,3 @@ class CustomTreePanel(
 
         if vadj:
             GLib.idle_add(lambda: vadj.set_value(saved_scroll) or False)
-
-    def _load_children(self, item: TreeItem):
-        """Load children for a directory."""
-        try:
-            entries = sorted(item.path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
-        except PermissionError:
-            return
-
-        item.children = []
-
-        parent_inherited = item.git_status if item.is_dir else ""
-
-        for i, entry in enumerate(entries):
-            is_last = i == len(entries) - 1
-            path_str = str(entry)
-
-            is_ignored = self._should_skip(entry)
-
-            if is_ignored:
-                git_status = "I"
-            elif path_str in self._git_modified_files:
-                git_status = self._git_status_map.get(path_str, "M")
-            elif parent_inherited:
-                git_status = parent_inherited
-            else:
-                git_status = ""
-            child = TreeItem(
-                name=entry.name,
-                path=entry,
-                is_dir=entry.is_dir(),
-                depth=item.depth + 1,
-                parent=item,
-                is_last=is_last,
-                git_status=git_status,
-            )
-            item.children.append(child)
-
-    def _should_skip(self, path: Path) -> bool:
-        """Check if a path should be skipped (uses cached compiled patterns)."""
-        name = path.name
-
-        workspace_root = None
-        path_str = str(path)
-        for root in self.roots:
-            root_str = str(root.path)
-            if path_str.startswith(root_str + os.sep) or path_str == root_str:
-                workspace_root = root_str
-                break
-
-        if workspace_root not in self._pattern_cache:
-            self._compile_patterns(workspace_root)
-
-        exact_names, compiled_globs = self._pattern_cache[workspace_root]
-
-        if name in exact_names:
-            return True
-        for regex in compiled_globs:
-            if regex.match(name):
-                return True
-
-        # Fall back to full GitIgnoreUtils matcher for path-based patterns
-        if workspace_root:
-            matcher = get_matcher(workspace_root)
-            return matcher.is_ignored(path_str, path.is_dir())
-
-        return False
-
-    def _compile_patterns(self, workspace_root):
-        """Compile and cache gitignore patterns for a workspace root."""
-        import fnmatch as fnmatch_mod
-        import re as re_mod
-
-        patterns = get_workspace_patterns(workspace_root) if workspace_root else get_global_patterns()
-        exact_names = set()
-        compiled_globs = []
-        for pattern in patterns:
-            if "*" in pattern:
-                compiled_globs.append(re_mod.compile(fnmatch_mod.translate(pattern)))
-            else:
-                exact_names.add(pattern)
-        self._pattern_cache[workspace_root] = (exact_names, compiled_globs)
-
-    def load_directory(self, path: Path, expanded: bool = False):
-        """Load a directory as a root."""
-        root = TreeItem(
-            name=path.name,
-            path=path,
-            is_dir=True,
-            depth=0,
-            expanded=expanded,
-            is_last=True,
-        )
-        self.roots.append(root)
-        if expanded:
-            self._load_children(root)
-        self._flatten_and_redraw()
-
-    def clear(self):
-        """Clear all items."""
-        self.roots = []
-        self.items = []
-        self._clear_selection()
-        self.hover_item = None
-        self._pattern_cache.clear()
-        self._request_redraw()
-
-    def set_git_modified_files(self, modified_files: Set[str], status_map: Optional[Dict[str, str]] = None):
-        """Set git modified files and update tree display."""
-        new_status_map = status_map or {}
-
-        if self._git_modified_files == modified_files and self._git_status_map == new_status_map:
-            return
-
-        self._git_modified_files = modified_files
-        self._git_status_map = new_status_map
-
-        # Pre-compute directories containing modified files
-        self._modified_dirs = set()
-        for file_path in modified_files:
-            parent = os.path.dirname(str(file_path))
-            while parent and parent not in self._modified_dirs:
-                self._modified_dirs.add(parent)
-                parent = os.path.dirname(parent)
-
-        self._update_item_git_status()
-        self._request_redraw()
-
-    def _update_item_git_status(self):
-        """Update git_status field on all tree items."""
-
-        def update_item(item: TreeItem, inherited_status: str = ""):
-            if item.git_status == "I":
-                for child in item.children:
-                    update_item(child, "I")
-                return
-
-            path_str = str(item.path)
-            if path_str in self._git_modified_files:
-                item.git_status = self._git_status_map.get(path_str, "M")
-            elif inherited_status:
-                item.git_status = inherited_status
-            else:
-                item.git_status = ""
-
-            child_inherited = item.git_status if item.is_dir else inherited_status
-            for child in item.children:
-                update_item(child, child_inherited)
-
-        for root in self.roots:
-            update_item(root)

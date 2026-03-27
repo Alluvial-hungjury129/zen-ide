@@ -65,7 +65,7 @@ zen ~/projects/my-app.zen-workspace   # open a workspace
 Smart features (autocomplete, semantic highlighting) for Python, JavaScript/TypeScript, and Terraform.
 Syntax highlighting via GtkSourceView built-in specs (100+ languages). .
 
-> See [`docs/2026_02_20_supported_formats.md`](docs/2026_02_20_supported_formats.md) for the full reference including viewer modes, file detection, and feature levels.
+> See the [Supported Languages](docs/wiki/Supported-Languages.md) wiki page for the full reference.
 
 ## AI Setup
 
@@ -97,7 +97,7 @@ Press `Cmd+Shift+/` (macOS) or `Ctrl+Shift+/` (Linux) inside the IDE to see all 
 
 Settings are stored in `~/.zen_ide/settings.json` which auto-generates on the first start.
 
-See `docs/2026_02_12_settings_reference.md` for details.
+See the [Settings](docs/wiki/Settings.md) wiki page for details.
 
 ## License
 

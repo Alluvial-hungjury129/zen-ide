@@ -5,62 +5,25 @@ directory helpers, word navigation) so every module uses a single implementation
 """
 
 import sys
-import unicodedata
 
-# ── Terminal display width ─────────────────────────────────────
-
-
-# Per-codepoint width cache: avoids repeated unicodedata lookups for the same
-# characters.  Tables and code blocks re-render the same box-drawing and
-# formatting characters thousands of times; this cache turns O(n) unicode
-# lookups into O(1) dict hits after the first encounter.
-_char_width_cache: dict[int, int] = {}
-
-
-def _char_display_width(cp: int, c: str) -> int:
-    """Return the display width of a single codepoint, with caching."""
-    cached = _char_width_cache.get(cp)
-    if cached is not None:
-        return cached
-    # Zero-width categories and variation selectors
-    if unicodedata.category(c) in ("Mn", "Me", "Cf") or 0xFE00 <= cp <= 0xFE0F or 0x1F3FB <= cp <= 0x1F3FF:
-        _char_width_cache[cp] = 0
-        return 0
-    eaw = unicodedata.east_asian_width(c)
-    w = 2 if eaw in ("W", "F") else 1
-    _char_width_cache[cp] = w
-    return w
-
-
-def display_width(s: str) -> int:
-    """Calculate terminal display width of a string, accounting for wide/emoji chars.
-
-    Returns the number of monospace cells the string occupies.
-    Wide (W) and fullwidth (F) East Asian characters count as 2;
-    zero-width marks, format chars, and variation selectors are skipped.
-
-    Fast-path: printable ASCII (0x20–0x7E) always has width 1, avoiding
-    expensive ``unicodedata`` lookups for the vast majority of text.
-
-    Uses a per-codepoint cache to avoid repeated unicodedata lookups for
-    box-drawing characters, table borders, and other repeated glyphs
-    commonly found in AI chat output.
-    """
-    w = 0
-    cache = _char_width_cache
-    for c in s:
-        cp = ord(c)
-        # Fast-path: printable ASCII is always width 1
-        if 0x20 <= cp <= 0x7E:
-            w += 1
-            continue
-        cached = cache.get(cp)
-        if cached is not None:
-            w += cached
-            continue
-        w += _char_display_width(cp, c)
-    return w
-
+# ── Re-exports from extracted modules ─────────────────────────
+# Many files do ``from shared.utils import <name>``; keep those working.
+from shared.color_utils import (  # noqa: F401
+    blend_hex_colors,
+    contrast_color,
+    contrast_ratio,
+    ensure_text_contrast,
+    hex_to_gdk_rgba,
+    hex_to_rgb,
+    hex_to_rgb_float,
+    hex_to_rgba,
+    hex_to_rgba_css,
+    relative_luminance,
+    tuple_to_gdk_rgba,
+)
+from shared.unicode_width import (  # noqa: F401
+    display_width,
+)
 
 # ── Word navigation helpers (treat _ as word char) ─────────────
 
@@ -233,183 +196,6 @@ def find_word_boundary_right(text, pos):
                 break
             i += 1
     return i
-
-
-# ── Colour helpers ──────────────────────────────────────────────
-
-
-def hex_to_rgb(hex_color: str) -> tuple:
-    """Convert hex color to RGB tuple with ints in 0-255 range.
-
-    Returns (38, 38, 38) for malformed input.
-    """
-    if not hex_color:
-        return (38, 38, 38)
-
-    h = hex_color.lstrip("#")
-    if len(h) != 6:
-        return (38, 38, 38)
-
-    try:
-        return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
-    except ValueError:
-        return (38, 38, 38)
-
-
-def hex_to_rgb_float(hex_color: str) -> tuple:
-    """Convert hex color to (r, g, b) floats in 0-1 range.
-
-    Returns (0.15, 0.15, 0.15) for malformed input.
-    """
-    if not hex_color:
-        return (0.15, 0.15, 0.15)
-
-    h = hex_color.lstrip("#")
-    if len(h) == 6:
-        try:
-            return (
-                int(h[0:2], 16) / 255.0,
-                int(h[2:4], 16) / 255.0,
-                int(h[4:6], 16) / 255.0,
-            )
-        except ValueError:
-            return (0.15, 0.15, 0.15)
-    return (0.15, 0.15, 0.15)
-
-
-def hex_to_rgba(hex_color: str, alpha: float = 1.0) -> tuple:
-    """Convert hex color to RGBA tuple with floats in 0-1 range.
-
-    Returns (0.15, 0.15, 0.15, alpha) for malformed input.
-    """
-    if not hex_color:
-        return (0.15, 0.15, 0.15, alpha)
-
-    h = hex_color.lstrip("#")
-    if len(h) != 6:
-        return (0.15, 0.15, 0.15, alpha)
-
-    try:
-        r = int(h[0:2], 16) / 255.0
-        g = int(h[2:4], 16) / 255.0
-        b = int(h[4:6], 16) / 255.0
-        return (r, g, b, alpha)
-    except ValueError:
-        return (0.15, 0.15, 0.15, alpha)
-
-
-def hex_to_gdk_rgba(hex_color: str, alpha: float = 1.0):
-    """Convert hex color string to a ``Gdk.RGBA`` with optional *alpha*.
-
-    Falls back to mid-gray on malformed input.
-    """
-    from gi.repository import Gdk
-
-    r, g, b, a = hex_to_rgba(hex_color, alpha)
-    c = Gdk.RGBA()
-    c.red, c.green, c.blue, c.alpha = r, g, b, a
-    return c
-
-
-def tuple_to_gdk_rgba(color_tuple, alpha: float | None = None):
-    """Convert an ``(r, g, b[, a])`` float tuple to a ``Gdk.RGBA``.
-
-    If *alpha* is given it overrides any alpha in the tuple.
-    """
-    from gi.repository import Gdk
-
-    c = Gdk.RGBA()
-    c.red, c.green, c.blue = color_tuple[0], color_tuple[1], color_tuple[2]
-    if alpha is not None:
-        c.alpha = alpha
-    elif len(color_tuple) >= 4:
-        c.alpha = color_tuple[3]
-    else:
-        c.alpha = 1.0
-    return c
-
-
-def hex_to_rgba_css(hex_color: str, alpha: float = 1.0) -> str:
-    """Convert hex color to CSS ``rgba(r, g, b, a)`` string.
-
-    Returns a fallback gray color for malformed input.
-    """
-    if not hex_color:
-        return f"rgba(38, 38, 38, {alpha})"  # fallback gray
-
-    h = hex_color.lstrip("#")
-    if len(h) != 6:
-        return f"rgba(38, 38, 38, {alpha})"  # fallback gray
-
-    try:
-        r = int(h[0:2], 16)
-        g = int(h[2:4], 16)
-        b = int(h[4:6], 16)
-        return f"rgba({r}, {g}, {b}, {alpha})"
-    except ValueError:
-        return f"rgba(38, 38, 38, {alpha})"  # fallback gray
-
-
-def blend_hex_colors(start_hex: str, end_hex: str, amount: float) -> str:
-    """Blend *start_hex* toward *end_hex* by *amount* in the 0-1 range.
-
-    Returns fallback color for malformed input.
-    """
-    if not start_hex or not end_hex:
-        return "#262626"  # fallback gray
-
-    amount = max(0.0, min(1.0, amount))
-    start = hex_to_rgb(start_hex)
-    end = hex_to_rgb(end_hex)
-    blended = tuple(round(s + (e - s) * amount) for s, e in zip(start, end, strict=False))
-    return "#{:02x}{:02x}{:02x}".format(*blended)
-
-
-def relative_luminance(hex_color: str) -> float:
-    """Return the WCAG relative luminance for *hex_color*."""
-
-    def _linearize(channel: int) -> float:
-        value = channel / 255.0
-        if value <= 0.04045:
-            return value / 12.92
-        return ((value + 0.055) / 1.055) ** 2.4
-
-    r, g, b = hex_to_rgb(hex_color)
-    return (0.2126 * _linearize(r)) + (0.7152 * _linearize(g)) + (0.0722 * _linearize(b))
-
-
-def contrast_ratio(color_a: str, color_b: str) -> float:
-    """Return the WCAG contrast ratio between two colors."""
-    luminance_a = relative_luminance(color_a)
-    luminance_b = relative_luminance(color_b)
-    lighter = max(luminance_a, luminance_b)
-    darker = min(luminance_a, luminance_b)
-    return (lighter + 0.05) / (darker + 0.05)
-
-
-def contrast_color(bg_hex: str) -> str:
-    """Return black or white text color for best contrast on *bg_hex*.
-
-    Uses a threshold of 0.6 (rather than 0.5) to favor white text
-    on medium-dark colors for better readability.
-    """
-    r, g, b = hex_to_rgb(bg_hex)
-    luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return "#000000" if luminance > 0.6 else "#ffffff"
-
-
-def ensure_text_contrast(bg_hex: str, fg_hex: str, min_ratio: float = 4.5) -> str:
-    """Adjust *bg_hex* just enough to reach *min_ratio* against *fg_hex*."""
-    if contrast_ratio(bg_hex, fg_hex) >= min_ratio:
-        return blend_hex_colors(bg_hex, bg_hex, 0.0)
-
-    target_hex = "#000000" if relative_luminance(fg_hex) > 0.5 else "#ffffff"
-    adjusted = bg_hex
-    for step in range(1, 11):
-        adjusted = blend_hex_colors(bg_hex, target_hex, step / 10)
-        if contrast_ratio(adjusted, fg_hex) >= min_ratio:
-            return adjusted
-    return adjusted
 
 
 # ── Font helpers ────────────────────────────────────────────────

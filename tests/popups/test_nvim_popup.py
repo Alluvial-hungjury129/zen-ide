@@ -27,8 +27,8 @@ class TestNvimPopupStructure:
         assert find_method(cls, "_on_key_pressed") is not None
 
     def test_has_present_method(self):
-        tree = parse_popup_source("nvim_popup.py")
-        cls = find_class(tree, "NvimPopup")
+        tree = parse_popup_source("popup_anchor.py")
+        cls = find_class(tree, "PopupAnchorMixin")
         assert find_method(cls, "present") is not None
 
     def test_has_close_method(self):
@@ -78,6 +78,6 @@ class TestNvimPopupStructure:
         assert "unsubscribe_theme_change" in source
 
     def test_primary_button_ensures_readable_white_text(self):
-        source = read_popup_source("nvim_popup.py")
+        source = read_popup_source("popup_styles.py")
         assert 'ensure_text_contrast(theme.accent_color, "#ffffff")' in source
         assert "color: #ffffff;" in source

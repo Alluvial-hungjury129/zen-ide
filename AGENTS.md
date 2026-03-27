@@ -108,7 +108,7 @@ One class per file, `snake_case` filenames, `PascalCase` class names matching th
 
 ### Continuous Documentation Alignment
 
-**Align docs whenever changes affect behavior.** New project docs belong under `docs/`, non-standard docs must use a `YYYY_MM_DD_` filename prefix, and all docs must follow [docs/standards/spec_format.md](docs/standards/spec_format.md). See [docs/standards/documentation.md](docs/standards/documentation.md).
+**Align docs whenever changes affect behavior.** Update all relevant surfaces: `README.md` (concise, links wiki only), `AGENTS.md` (links `docs/`), `docs/` (exhaustive technical reference), and `docs/wiki/` (user-facing details). New project docs belong under `docs/`, non-standard docs must use a `YYYY_MM_DD_` filename prefix, and all docs must follow [docs/standards/spec_format.md](docs/standards/spec_format.md). See [docs/standards/documentation.md](docs/standards/documentation.md) for full scoping rules.
 
 ### Startup Performance — Zero Regression Policy
 

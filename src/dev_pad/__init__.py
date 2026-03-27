@@ -9,7 +9,8 @@ Submodules:
 - dev_pad.dev_pad_storage: Persistence and data classes
 """
 
-from .dev_pad import DevPad, log_file_activity, log_sketch_activity
+from .activity_store import log_file_activity, log_sketch_activity
+from .dev_pad import DevPad
 from .dev_pad_storage import NOTES_DIR, DevPadActivity, DevPadStorage, get_dev_pad_storage
 
 __all__ = [

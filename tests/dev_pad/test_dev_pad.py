@@ -129,7 +129,7 @@ class TestGetSketchPreview:
 class TestLogFileActivity:
     """Test log_file_activity helper."""
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_logs_open_activity(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -143,7 +143,7 @@ class TestLogFileActivity:
         assert call_kwargs[1]["link_type"] == "file"
         assert call_kwargs[1]["link_target"] == "/home/user/project/main.py"
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_logs_edit_activity(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -153,7 +153,7 @@ class TestLogFileActivity:
         call_kwargs = mock_storage.update_or_add_activity.call_args
         assert call_kwargs[1]["activity_type"] == "file_edit"
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_default_action_is_open(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -167,7 +167,7 @@ class TestLogFileActivity:
 class TestLogNewFileActivity:
     """Test log_new_file_activity helper."""
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_returns_activity_id(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_activity = MagicMock()
@@ -186,7 +186,7 @@ class TestLogNewFileActivity:
 class TestRemoveNewFileActivity:
     """Test remove_new_file_activity helper."""
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_deletes_by_id(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -199,7 +199,7 @@ class TestRemoveNewFileActivity:
 class TestLogAiActivity:
     """Test log_ai_activity helper."""
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_short_question(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -211,7 +211,7 @@ class TestLogAiActivity:
         assert call_kwargs[1]["title"] == "AI Chat"
         assert "How do I sort a list?" in call_kwargs[1]["description"]
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_long_question_truncated_in_description(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -223,7 +223,7 @@ class TestLogAiActivity:
         assert len(call_kwargs[1]["description"]) < 100
         assert "..." in call_kwargs[1]["description"]
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_with_chat_id(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -234,7 +234,7 @@ class TestLogAiActivity:
         assert call_kwargs[1]["link_type"] == "ai_chat"
         assert call_kwargs[1]["link_target"] == "chat-42"
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_without_chat_id(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -244,7 +244,7 @@ class TestLogAiActivity:
         call_kwargs = mock_storage.update_or_add_activity.call_args
         assert call_kwargs[1]["link_type"] is None
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_with_custom_title(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -259,7 +259,7 @@ class TestLogAiActivity:
 class TestLogGitActivity:
     """Test log_git_activity helper."""
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_with_branch(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -272,7 +272,7 @@ class TestLogGitActivity:
         assert call_kwargs[1]["link_type"] == "repo"
         assert call_kwargs[1]["link_target"] == "/repo"
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_without_branch(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -287,7 +287,7 @@ class TestLogGitActivity:
 class TestLogSearchActivity:
     """Test log_search_activity helper."""
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_with_results(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -299,7 +299,7 @@ class TestLogSearchActivity:
         assert "TODO" in call_kwargs[1]["title"]
         assert "5 results" in call_kwargs[1]["description"]
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_without_results(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -313,7 +313,7 @@ class TestLogSearchActivity:
 class TestLogCustomActivity:
     """Test log_custom_activity helper."""
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_full_params(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -326,7 +326,7 @@ class TestLogCustomActivity:
         assert call_kwargs[1]["description"] == "npm run build"
         assert call_kwargs[1]["link_type"] == "url"
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_description_defaults_to_title(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -340,7 +340,7 @@ class TestLogCustomActivity:
 class TestLogGithubPrActivity:
     """Test log_github_pr_activity helper."""
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_basic_pr(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -354,7 +354,7 @@ class TestLogGithubPrActivity:
         assert call_kwargs[1]["link_type"] == "url"
         assert "my-repo" in call_kwargs[1]["description"]
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_with_created_at(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
@@ -364,7 +364,7 @@ class TestLogGithubPrActivity:
         call_kwargs = mock_storage.update_or_add_activity.call_args
         assert "Jun 15, 2024" in call_kwargs[1]["description"]
 
-    @patch("dev_pad.dev_pad.get_dev_pad_storage")
+    @patch("dev_pad.activity_store.get_dev_pad_storage")
     def test_without_repo_name(self, mock_get_storage):
         mock_storage = MagicMock()
         mock_get_storage.return_value = mock_storage
