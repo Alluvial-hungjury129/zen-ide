@@ -9,7 +9,7 @@ import shutil
 import subprocess
 from typing import Optional
 
-from ai.cli.cli_provider_mixin import CLIProvider
+from ai.cli.cli_provider import CLIProvider
 
 # Managed marker to identify Zen IDE's section in copilot-instructions.md
 _ZEN_MARKER_START = "<!-- zen-ide-context-start -->"

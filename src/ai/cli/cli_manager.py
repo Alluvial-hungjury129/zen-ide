@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import threading
 
-from ai.cli.cli_provider_mixin import CLIProvider, _model_cache
+from ai.cli.cli_provider import CLIProvider, _model_cache
 
 
 class CLIManager:

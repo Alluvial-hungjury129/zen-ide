@@ -19,6 +19,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from icons.icon_manager import Icons  # noqa: E402
+
 from treeview.tree_icons import (  # noqa: E402
     CHEVRON_COLLAPSED,
     CHEVRON_EXPANDED,

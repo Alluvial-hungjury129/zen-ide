@@ -7,7 +7,7 @@ import pathlib
 import shutil
 from typing import Optional
 
-from ai.cli.cli_provider_mixin import CLIProvider
+from ai.cli.cli_provider import CLIProvider
 
 
 class ClaudeCLI(CLIProvider):
