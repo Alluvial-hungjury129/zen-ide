@@ -94,7 +94,7 @@ FOLD_NODE_TYPES = {
 _CHEVRON_SIZE = 7
 _CHEVRON_COL_WIDTH = 14  # extra pixels for the chevron area
 _NUM_RIGHT_PAD = 6  # gap between number text and chevron area
-_NUM_LEFT_PAD = 8  # left padding before line number
+_NUM_LEFT_PAD = 14  # left padding before line number (matches chevron area)
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +233,8 @@ class LineNumberFoldRenderer(GtkSource.GutterRenderer):
 
         self._icon_layout.set_text(glyph, -1)
         _ink, icon_log = self._icon_layout.get_pixel_extents()
-        ix = total_w - _CHEVRON_COL_WIDTH + (_CHEVRON_COL_WIDTH - icon_log.width) / 2
+        chevron_zone = _NUM_RIGHT_PAD + _CHEVRON_COL_WIDTH
+        ix = _NUM_LEFT_PAD + num_col_width + (chevron_zone - icon_log.width) / 2
         iy = line_y + (line_h - icon_log.height) / 2
 
         snapshot.save()
