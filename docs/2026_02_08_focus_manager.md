@@ -14,12 +14,12 @@ The Focus Manager provides centralized focus state management for Zen IDE compon
 
 The system consists of two main parts:
 
-1. **ComponentFocusManager** (`src/shared/focus_manager.py`) - Singleton that tracks which component has focus
+1. **FocusManager** (`src/shared/focus_manager.py`) - Singleton that tracks which component has focus
 2. **FocusBorderMixin** (`src/shared/focus_border_mixin.py`) - Mixin that provides CSS-based focus borders
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                  ComponentFocusManager                       │
+│                  FocusManager                       │
 │  (singleton - tracks focus state for all components)        │
 │                                                              │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
@@ -35,17 +35,17 @@ The system consists of two main parts:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## ComponentFocusManager
+## FocusManager
 
 A singleton that manages focus state for all IDE components.
 
 ### Usage
 
 ```python
-from focus_manager import get_component_focus_manager
+from focus_manager import get_focus_manager
 
 # Get the singleton
-focus_mgr = get_component_focus_manager()
+focus_mgr = get_focus_manager()
 
 # Register a component with callbacks
 focus_mgr.register(
@@ -124,7 +124,7 @@ Typical integration in a component:
 
 ```python
 from gi.repository import Gtk
-from focus_manager import get_component_focus_manager
+from focus_manager import get_focus_manager
 from focus_border_mixin import FocusBorderMixin
 
 class TerminalPanel(FocusBorderMixin, Gtk.Box):
@@ -135,7 +135,7 @@ class TerminalPanel(FocusBorderMixin, Gtk.Box):
         self._init_focus_border()
 
         # Register with focus manager
-        focus_mgr = get_component_focus_manager()
+        focus_mgr = get_focus_manager()
         focus_mgr.register(
             self.COMPONENT_ID,
             on_focus_in=self._on_focus_in,
@@ -147,7 +147,7 @@ class TerminalPanel(FocusBorderMixin, Gtk.Box):
         self.add_controller(click)
 
     def _on_click(self, gesture, n_press, x, y):
-        get_component_focus_manager().set_focus(self.COMPONENT_ID)
+        get_focus_manager().set_focus(self.COMPONENT_ID)
 
     def _on_focus_in(self):
         self._set_focused(True)
@@ -156,7 +156,7 @@ class TerminalPanel(FocusBorderMixin, Gtk.Box):
         self._set_focused(False)
 
     def destroy(self):
-        get_component_focus_manager().unregister(self.COMPONENT_ID)
+        get_focus_manager().unregister(self.COMPONENT_ID)
         super().destroy()
 ```
 
@@ -183,5 +183,5 @@ The Focus Manager provides:
 
 | File | Description |
 |------|-------------|
-| `src/shared/focus_manager.py` | ComponentFocusManager singleton |
+| `src/shared/focus_manager.py` | FocusManager singleton |
 | `src/shared/focus_border_mixin.py` | FocusBorderMixin with CSS classes |

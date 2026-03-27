@@ -248,7 +248,7 @@ Braille-dot animation: `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`, cycled every 80ms via `
 
 - **Keybindings**: AI chat toggle, new session, model switching
 - **Workspace context**: `get_workspace_folders()`, `get_current_file()` callbacks
-- **Focus management**: `ComponentFocusManager` with `"ai_chat"` component ID
+- **Focus management**: `FocusManager` with `"ai_chat"` component ID
 - **Theme system**: Colors propagated via `_on_theme_change()` and `update_colors()`
 - **Font settings**: Per-component font config via `get_font_settings("ai_chat")`
 

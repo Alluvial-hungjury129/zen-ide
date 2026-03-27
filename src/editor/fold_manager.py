@@ -12,7 +12,7 @@ from gi.repository import GLib, Gtk
 from shared.settings import get_setting
 from themes import subscribe_settings_change
 
-from .fold_gutter import LineNumberFoldRenderer
+from .line_number_fold_renderer import LineNumberFoldRenderer
 
 # ---------------------------------------------------------------------------
 # Foldable node types per tree-sitter language
@@ -197,7 +197,7 @@ class FoldManager:
         if not buf:
             return False
 
-        from .tree_sitter_buffer import ts_lang_for_buffer
+        from .tree_sitter_buffer_cache import ts_lang_for_buffer
 
         lang_id = ts_lang_for_buffer(buf)
 

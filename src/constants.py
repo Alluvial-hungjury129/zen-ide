@@ -18,7 +18,7 @@ DEFAULT_FONT_SIZE = 16
 MIN_FONT_SIZE = 8
 MAX_FONT_SIZE = 36
 
-# Nerd Font Icons
+# Nerd Font IconsManager
 NERD_ICON_SIZE_OFFSET = 3  # extra points added to icon font size vs text size
 
 # Tree View

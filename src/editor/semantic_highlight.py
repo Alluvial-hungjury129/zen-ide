@@ -156,7 +156,7 @@ def _apply_semantic_tags(buf, tab=None):
         return
 
     try:
-        from .tree_sitter_buffer import ts_lang_for_buffer
+        from .tree_sitter_buffer_cache import ts_lang_for_buffer
         from .tree_sitter_semantic import extract_semantic_tokens
     except Exception:
         return

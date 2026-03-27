@@ -6,7 +6,7 @@ Internal module used by sketch_model_arrow.
 
 from __future__ import annotations
 
-from sketch_pad.sketch_model_base import AbstractShape
+from sketch_pad.abstract_shape import AbstractShape
 
 
 def _clamp_edge_ratio_v(box: AbstractShape, target_y: float) -> float:

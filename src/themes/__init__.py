@@ -3,8 +3,8 @@ Theme package for Zen IDE.
 Re-exports all public API from submodules.
 """
 
-from themes.theme_definitions import THEMES
-from themes.theme_manager import (
+from themes.theme import Theme
+from themes.theme_aware_mixin import (
     ThemeAwareMixin,
     get_ai_settings,
     get_setting,
@@ -18,7 +18,7 @@ from themes.theme_manager import (
     toggle_dark_light,
     unsubscribe_theme_change,
 )
-from themes.theme_model import Theme
+from themes.theme_definitions import THEMES
 
 __all__ = [
     "Theme",

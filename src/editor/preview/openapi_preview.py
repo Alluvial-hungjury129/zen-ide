@@ -48,7 +48,7 @@ from editor.preview.openapi_scroll_sync import (  # noqa: F401
 from editor.preview.preview_scroll_mixin import SCROLL_SYNC_JS, PreviewScrollMixin
 from gi_requirements import load_webkit
 from themes import ThemeAwareMixin, get_theme
-from themes.theme_manager import get_setting
+from themes.theme_aware_mixin import get_setting
 
 # --- Backend detection (same as markdown_preview) ---
 
@@ -284,7 +284,7 @@ class OpenAPIPreview(ThemeAwareMixin, PreviewScrollMixin, Gtk.Box):
 
     def _on_macos_scroll(self, _ctrl, dx, dy):
         if self._macos_attached:
-            from themes.theme_manager import get_setting
+            from themes.theme_aware_mixin import get_setting
 
             speed = get_setting("scroll_speed", 0.4)
             px_per_unit = 50 * speed

@@ -9,18 +9,18 @@ When unfocused, the border dims and scrollbars are hidden.
 from typing import Callable, Dict, Optional
 
 # Singleton instance for component focus management
-_component_focus_manager_instance: Optional["ComponentFocusManager"] = None
+_focus_manager_instance: Optional["FocusManager"] = None
 
 
-def get_component_focus_manager() -> "ComponentFocusManager":
-    """Get the singleton ComponentFocusManager instance."""
-    global _component_focus_manager_instance
-    if _component_focus_manager_instance is None:
-        _component_focus_manager_instance = ComponentFocusManager()
-    return _component_focus_manager_instance
+def get_focus_manager() -> "FocusManager":
+    """Get the singleton FocusManager instance."""
+    global _focus_manager_instance
+    if _focus_manager_instance is None:
+        _focus_manager_instance = FocusManager()
+    return _focus_manager_instance
 
 
-class ComponentFocusManager:
+class FocusManager:
     """
     Manages focus state for main IDE components (terminal, editor, treeview, etc.).
 

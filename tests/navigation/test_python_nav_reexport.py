@@ -1,6 +1,6 @@
 """Tests for Python navigation re-export resolution in Case 2b (local variable from imported class)."""
 
-from navigation.code_navigation_py import PythonNavigationMixin
+from navigation.python_navigation_mixin import PythonNavigationMixin
 
 
 class StubMixin(PythonNavigationMixin):
@@ -192,12 +192,12 @@ class TestAbsoluteImportReexport:
     """Test re-export resolution for absolute imports in __init__.py."""
 
     def test_resolves_absolute_reexport_same_package(self, tmp_path):
-        """from themes.theme_manager import get_theme (absolute, same package)."""
+        """from themes.theme_aware_mixin import get_theme (absolute, same package)."""
         pkg_dir = tmp_path / "themes"
         pkg_dir.mkdir()
         init = pkg_dir / "__init__.py"
-        init.write_text("from themes.theme_manager import get_theme\n")
-        manager = pkg_dir / "theme_manager.py"
+        init.write_text("from themes.theme_aware_mixin import get_theme\n")
+        manager = pkg_dir / "theme_aware_mixin.py"
         manager.write_text("def get_theme():\n    pass\n")
 
         stub = StubMixin()
@@ -205,12 +205,12 @@ class TestAbsoluteImportReexport:
         assert result == str(manager)
 
     def test_resolves_absolute_reexport_multiline(self, tmp_path):
-        """from themes.theme_manager import (... get_theme ...) multiline."""
+        """from themes.theme_aware_mixin import (... get_theme ...) multiline."""
         pkg_dir = tmp_path / "themes"
         pkg_dir.mkdir()
         init = pkg_dir / "__init__.py"
-        init.write_text("from themes.theme_manager import (\n    get_setting,\n    get_theme,\n    set_theme,\n)\n")
-        manager = pkg_dir / "theme_manager.py"
+        init.write_text("from themes.theme_aware_mixin import (\n    get_setting,\n    get_theme,\n    set_theme,\n)\n")
+        manager = pkg_dir / "theme_aware_mixin.py"
         manager.write_text("def get_theme():\n    pass\n")
 
         stub = StubMixin()

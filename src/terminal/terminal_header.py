@@ -1,6 +1,6 @@
 """Shared terminal header bar builder — used by both TerminalView and TerminalStack."""
 
-from icons import Icons
+from icons import IconsManager
 from shared.ui import ZenButton
 from terminal.base_terminal_header import BaseTerminalHeader
 
@@ -23,6 +23,6 @@ class TerminalHeader(BaseTerminalHeader):
 
         self.close_btn = None
         if include_close:
-            self.close_btn = ZenButton(icon=Icons.CLOSE, tooltip="Close terminal")
+            self.close_btn = ZenButton(icon=IconsManager.CLOSE, tooltip="Close terminal")
             self.close_btn.set_visible(False)
             self.box.append(self.close_btn)

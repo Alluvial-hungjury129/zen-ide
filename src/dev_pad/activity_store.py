@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional
 
 from dev_pad.dev_pad_storage import get_dev_pad_storage
-from icons import Icons
+from icons import IconsManager
 
 
 def _abbreviate_path(path: str, max_len: int = 50) -> str:
@@ -33,28 +33,28 @@ def _abbreviate_path(path: str, max_len: int = 50) -> str:
 def _get_activity_icon(activity_type: str) -> str:
     """Get an icon for the activity type."""
     icons = {
-        "file_edit": Icons.EDIT,
-        "file_open": Icons.FILE,
-        "file_save": Icons.SAVE,
-        "file_new": Icons.CLIPBOARD,
-        "ai_chat": Icons.ROBOT,
-        "ai_question": Icons.QUESTION,
-        "git_checkout": Icons.GIT_BRANCH,
-        "git_commit": Icons.CHECK,
-        "git_push": Icons.ARROW_UP,
-        "git_pull": Icons.ARROW_DOWN,
-        "search": Icons.SEARCH,
-        "terminal": Icons.TERMINAL,
-        "error": Icons.ERROR,
-        "debug": Icons.BUG,
-        "test": Icons.FLASK,
-        "build": Icons.HAMMER,
-        "pr_review": Icons.EYE,
-        "github_pr": Icons.GIT_MERGE,
-        "note": Icons.PIN,
-        "sketch": Icons.PENCIL,
+        "file_edit": IconsManager.EDIT,
+        "file_open": IconsManager.FILE,
+        "file_save": IconsManager.SAVE,
+        "file_new": IconsManager.CLIPBOARD,
+        "ai_chat": IconsManager.ROBOT,
+        "ai_question": IconsManager.QUESTION,
+        "git_checkout": IconsManager.GIT_BRANCH,
+        "git_commit": IconsManager.CHECK,
+        "git_push": IconsManager.ARROW_UP,
+        "git_pull": IconsManager.ARROW_DOWN,
+        "search": IconsManager.SEARCH,
+        "terminal": IconsManager.TERMINAL,
+        "error": IconsManager.ERROR,
+        "debug": IconsManager.BUG,
+        "test": IconsManager.FLASK,
+        "build": IconsManager.HAMMER,
+        "pr_review": IconsManager.EYE,
+        "github_pr": IconsManager.GIT_MERGE,
+        "note": IconsManager.PIN,
+        "sketch": IconsManager.PENCIL,
     }
-    return icons.get(activity_type, Icons.MODIFIED_DOT)
+    return icons.get(activity_type, IconsManager.MODIFIED_DOT)
 
 
 def _get_sketch_preview(content: str, max_lines: int = 8, max_width: int = 60) -> str:

@@ -7,9 +7,9 @@ Inline revert buttons appear at the start of each diff region.
 from gi.repository import Gdk, Gtk, GtkSource, Pango
 
 # Re-export public names so existing `from editor.preview.diff_view import X` still works
-from editor.preview.diff_gutter import DiffGutterMixin, DiffMinimap, RevertGutterRenderer  # noqa: F401
-from editor.preview.diff_navigation import DiffNavigationMixin
-from editor.preview.diff_parser import (  # noqa: F401
+from editor.preview.diff_gutter_mixin import DiffGutterMixin, DiffMinimap, RevertGutterRenderer  # noqa: F401
+from editor.preview.diff_navigation_mixin import DiffNavigationMixin
+from editor.preview.diff_parser_mixin import (  # noqa: F401
     DIFF_ADD_RGBA,
     DIFF_CHANGE_RGBA,
     DIFF_DEL_RGBA,
@@ -19,9 +19,9 @@ from editor.preview.diff_parser import (  # noqa: F401
     _diff_gutter_colors,
 )
 from fonts import get_font_settings
-from icons import Icons
+from icons import IconsManager
 from shared.focus_border_mixin import FocusBorderMixin
-from shared.focus_manager import get_component_focus_manager
+from shared.focus_manager import get_focus_manager
 from shared.ui import ZenButton
 from themes import ThemeAwareMixin, get_theme
 
@@ -66,7 +66,7 @@ class DiffView(DiffParserMixin, DiffGutterMixin, DiffNavigationMixin, ThemeAware
         self._init_focus_border()
 
         # Register with focus manager so other panels unfocus properly
-        focus_mgr = get_component_focus_manager()
+        focus_mgr = get_focus_manager()
         focus_mgr.register(
             self.COMPONENT_ID,
             on_focus_in=lambda: self._set_focused(True),
@@ -74,8 +74,8 @@ class DiffView(DiffParserMixin, DiffGutterMixin, DiffNavigationMixin, ThemeAware
         )
 
         focus_ctrl = Gtk.EventControllerFocus()
-        focus_ctrl.connect("enter", lambda _: get_component_focus_manager().set_focus(self.COMPONENT_ID))
-        focus_ctrl.connect("leave", lambda _: get_component_focus_manager().clear_focus(self.COMPONENT_ID))
+        focus_ctrl.connect("enter", lambda _: get_focus_manager().set_focus(self.COMPONENT_ID))
+        focus_ctrl.connect("leave", lambda _: get_focus_manager().clear_focus(self.COMPONENT_ID))
         self.add_controller(focus_ctrl)
 
         self._syncing_scroll = False
@@ -330,7 +330,7 @@ class DiffView(DiffParserMixin, DiffGutterMixin, DiffNavigationMixin, ThemeAware
         header.set_margin_bottom(4)
 
         # Close button
-        close_btn = ZenButton(icon=Icons.CLOSE, tooltip="Close (Esc)")
+        close_btn = ZenButton(icon=IconsManager.CLOSE, tooltip="Close (Esc)")
         close_btn.set_focusable(False)
         close_btn.connect("clicked", lambda b: self._close())
         header.append(close_btn)
@@ -360,7 +360,7 @@ class DiffView(DiffParserMixin, DiffGutterMixin, DiffNavigationMixin, ThemeAware
         header.append(self._commit_label)
 
         # Navigation: next button (newer commit)
-        self._next_btn = ZenButton(label=Icons.PLAY, tooltip="Newer commit (→)")
+        self._next_btn = ZenButton(label=IconsManager.PLAY, tooltip="Newer commit (→)")
         self._next_btn.add_css_class("diff-nav-btn")
         self._next_btn.set_focusable(False)
         self._next_btn.connect("clicked", lambda b: self._navigate_commit(-1))

@@ -141,7 +141,7 @@ class TestTabClosePersistence:
 
     def test_on_tab_closed_does_not_call_save_workspace_directly(self):
         """save_workspace should NOT be called synchronously — it's deferred."""
-        from main.window_events import WindowEventsMixin
+        from main.window_events_mixin import WindowEventsMixin
 
         obj = MagicMock(spec=WindowEventsMixin)
         obj.editor_view = MagicMock()
@@ -157,7 +157,7 @@ class TestTabClosePersistence:
 
     def test_update_ide_state_uses_debounce(self):
         """_update_ide_state_file should create a Debouncer instance."""
-        from main.window_state import WindowStateMixin
+        from main.window_state_mixin import WindowStateMixin
 
         obj = MagicMock(spec=WindowStateMixin)
         obj._ide_state_debouncer = None
@@ -166,7 +166,7 @@ class TestTabClosePersistence:
         WindowStateMixin._update_ide_state_file(obj)
 
         assert obj._ide_state_debouncer is not None
-        from shared.debounce import Debouncer
+        from shared.debouncer import Debouncer
 
         assert isinstance(obj._ide_state_debouncer, Debouncer)
 

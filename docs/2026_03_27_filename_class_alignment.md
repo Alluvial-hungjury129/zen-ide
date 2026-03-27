@@ -2,7 +2,7 @@
 
 **Created_at:** 2026-03-27
 **Updated_at:** 2026-03-27
-**Status:** Planned
+**Status:** Done
 **Goal:** Rename every file so its snake_case name exactly matches its PascalCase class
 **Scope:** All 20 violations in `src/`
 
@@ -35,7 +35,7 @@ These files are imported in at most one place, so each rename is a single-commit
 | 9 | `shared/system_monitor.py` | `SystemMonitorPanel` | `shared/system_monitor_panel.py` | `zen_ide.py`, `popups/system_monitor_dialog.py` |
 | 10 | `editor/tree_sitter_buffer.py` | `TreeSitterBufferCache` | `editor/tree_sitter_buffer_cache.py` | `editor/semantic_highlight.py`, `editor/fold_manager.py`, `editor/editor_view/editor_tab.py` |
 
-- [x] Status: not started
+- [x] Status: done
 
 ---
 
@@ -47,11 +47,11 @@ More importers to update. Still straightforward — just more lines to touch.
 |---|----------|-------|----------|--------------|
 | 11 | `icons/icon_manager.py` | `Icons` | `icons/icons.py` | 1 (`icons/__init__.py`) |
 | 12 | `treeview/tree_panel.py` | `CustomTreePanel` | `treeview/custom_tree_panel.py` | 2 (`treeview/__init__.py`, `treeview/tree_view.py`) |
-| 13 | `shared/focus_manager.py` | `ComponentFocusManager` | `shared/component_focus_manager.py` | ~15 files across `ai/`, `shared/`, `treeview/`, `main/`, `terminal/`, `editor/` |
+| 13 | `shared/focus_manager.py` | `FocusManager` | `shared/focus_manager.py` | ~15 files across `ai/`, `shared/`, `treeview/`, `main/`, `terminal/`, `editor/` |
 | 14 | `themes/theme_model.py` | `Theme` | `themes/theme.py` | ~40 theme definition files + `themes/__init__.py`, `themes/theme_manager.py` |
 | 15 | `themes/theme_manager.py` | `ThemeAwareMixin` | `themes/theme_aware.py` | `themes/__init__.py`, 3 preview files |
 
-- [x] Status: not started
+- [x] Status: done
 
 ---
 
@@ -67,7 +67,7 @@ These touch entry points, `__init__.py` packages, or require a file split.
 | 19 | `sketch_pad/canvas/core.py` | `SketchCanvas` | `sketch_pad/canvas/sketch_canvas.py` | Re-exported in `__init__.py`; also imported in `keyboard.py` |
 | 20 | `ai/cli/cli_manager.py` | `CLIProvider` + `CLIManager` | Split → `ai/cli/cli_provider.py` + `ai/cli/cli_manager.py` | Two classes violate one-class-per-file. `CLIProvider` (ABC) is imported by `claude_cli.py`, `copilot_cli.py`. `CLIManager` is imported everywhere via `cli_manager` singleton. Split `CLIProvider` out first, then the file naturally keeps `CLIManager`. |
 
-- [x] Status: not started
+- [x] Status: done
 
 ---
 

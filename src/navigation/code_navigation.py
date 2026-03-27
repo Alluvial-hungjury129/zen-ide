@@ -13,11 +13,11 @@ from typing import Callable, Optional
 
 from gi.repository import GLib, Gtk, GtkSource
 
-from editor.nav_highlight import nav_highlight
+from editor.navigation_highlight import nav_highlight
 
-from .code_navigation_py import PythonNavigationMixin
-from .code_navigation_tf import TerraformNavigationMixin
-from .code_navigation_ts import TypeScriptNavigationMixin
+from .python_navigation_mixin import PythonNavigationMixin
+from .terraform_navigation_mixin import TerraformNavigationMixin
+from .type_script_navigation_mixin import TypeScriptNavigationMixin
 
 
 class CodeNavigation(PythonNavigationMixin, TerraformNavigationMixin, TypeScriptNavigationMixin):

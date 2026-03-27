@@ -1,6 +1,6 @@
 """Tests for context_gatherer — building FIM context from editor state."""
 
-from editor.inline_completion.context_gatherer import (
+from editor.inline_completion.completion_context import (
     _MAX_PREFIX_CHARS,
     _MAX_SUFFIX_CHARS,
     CompletionContext,

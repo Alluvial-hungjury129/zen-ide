@@ -13,20 +13,20 @@ Usage::
     from shared.ui import ZenButton
 
     # Icon-only button
-    btn = ZenButton(icon=Icons.TRASH, tooltip="Clear")
+    btn = ZenButton(icon=IconsManager.TRASH, tooltip="Clear")
     btn.connect("clicked", on_clear)
 
     # Text button
     btn = ZenButton(label="Replace All")
 
     # Icon + text button
-    btn = ZenButton(icon=Icons.PLUS, label="Note")
+    btn = ZenButton(icon=IconsManager.PLUS, label="Note")
 
     # Primary action button
     btn = ZenButton(label="OK", variant="primary")
 
     # Toggle button
-    btn = ZenButton(icon=Icons.TOOL_SELECT, tooltip="Select", toggle=True)
+    btn = ZenButton(icon=IconsManager.TOOL_SELECT, tooltip="Select", toggle=True)
 """
 
 from gi.repository import Gdk, Gtk

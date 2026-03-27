@@ -1,6 +1,6 @@
 """New Aura Dark theme - based on Aura Soft Dark variant."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 NEW_AURA_DARK = Theme(
     name="new_aura_dark",

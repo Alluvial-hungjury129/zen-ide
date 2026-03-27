@@ -1,6 +1,6 @@
 """64 Basic Dreams — Commodore 64 inspired palette."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 C64_DREAMS = Theme(
     name="c64_dreams",

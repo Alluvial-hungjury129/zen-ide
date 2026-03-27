@@ -1,6 +1,6 @@
 """Tests for editor/autocomplete/terraform_provider.py - Terraform completions."""
 
-from editor.autocomplete.terraform_provider import TerraformCompletionProvider
+from editor.autocomplete.terraform_completion_provider import TerraformCompletionProvider
 
 
 class TestExtractBlockBodies:

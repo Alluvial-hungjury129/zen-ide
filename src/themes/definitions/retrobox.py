@@ -1,6 +1,6 @@
 """Retrobox theme - CGA/retro terminal inspired, based on Vim's retrobox colorscheme."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 RETROBOX = Theme(
     name="retrobox",

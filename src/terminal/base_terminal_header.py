@@ -6,7 +6,7 @@ from constants import (
     TERMINAL_HEADER_MARGIN_BOTTOM,
     TERMINAL_HEADER_MARGIN_TOP,
 )
-from icons import Icons
+from icons import IconsManager
 from shared.ui import ZenButton
 
 
@@ -42,13 +42,13 @@ class BaseTerminalHeader:
         self._spacer.set_hexpand(True)
         self.box.append(self._spacer)
 
-        self.clear_btn = ZenButton(icon=Icons.TRASH, tooltip="Clear")
+        self.clear_btn = ZenButton(icon=IconsManager.TRASH, tooltip="Clear")
         self.box.append(self.clear_btn)
 
-        self.add_btn = ZenButton(icon=Icons.PLUS, tooltip=add_tooltip)
+        self.add_btn = ZenButton(icon=IconsManager.PLUS, tooltip=add_tooltip)
         self.box.append(self.add_btn)
 
-        self.maximize_btn = ZenButton(icon=Icons.MAXIMIZE, tooltip="Maximize")
+        self.maximize_btn = ZenButton(icon=IconsManager.MAXIMIZE, tooltip="Maximize")
         self.box.append(self.maximize_btn)
 
         self.apply_header_font()

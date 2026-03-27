@@ -1,6 +1,6 @@
 """CGA Dream theme — a neon hallucination of 1984 CGA, magenta-cyan on black."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 CGA_DREAM = Theme(
     name="cga_dream",

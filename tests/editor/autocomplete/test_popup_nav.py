@@ -335,7 +335,7 @@ class TestAutoDismissOnExactMatch:
 
         self._setup_buffer_changed(ac, "onboarding_client")
 
-        with patch("editor.autocomplete.completion_popup.get_theme"):
+        with patch("editor.autocomplete.completion_popup_mixin.get_theme"):
             ac._on_buffer_changed(ac._buffer)
 
         ac._popup.popdown.assert_called()
@@ -350,7 +350,7 @@ class TestAutoDismissOnExactMatch:
 
         self._setup_buffer_changed(ac, "onboarding")
 
-        with patch("editor.autocomplete.completion_popup.get_theme"):
+        with patch("editor.autocomplete.completion_popup_mixin.get_theme"):
             ac._on_buffer_changed(ac._buffer)
 
         ac._popup.popdown.assert_not_called()
@@ -362,7 +362,7 @@ class TestAutoDismissOnExactMatch:
 
         self._setup_buffer_changed(ac, "bar")
 
-        with patch("editor.autocomplete.completion_popup.get_theme"):
+        with patch("editor.autocomplete.completion_popup_mixin.get_theme"):
             ac._on_buffer_changed(ac._buffer)
 
         # hide() is called which calls popdown

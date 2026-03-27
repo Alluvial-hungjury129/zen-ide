@@ -113,7 +113,7 @@ def show_input(
 ):
     """Show an input dialog and return it."""
     from popups.nvim_popup import show_popup
-    from popups.system_dialogs import SystemInputDialog
+    from popups.system_command_palette_dialog import SystemInputDialog
 
     return show_popup(
         InputDialog,

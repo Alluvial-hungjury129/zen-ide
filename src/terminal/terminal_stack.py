@@ -5,10 +5,10 @@ import os
 from gi.repository import Gtk
 
 from shared.focus_border_mixin import FocusBorderMixin
-from shared.focus_manager import get_component_focus_manager
+from shared.focus_manager import get_focus_manager
 from shared.gtk_event_utils import is_button_click, is_click_inside_widget
 from shared.settings import get_setting
-from terminal.terminal_tab_bar import TerminalTabBarMixin
+from terminal.terminal_tab_bar_mixin import TerminalTabBarMixin
 
 
 class TerminalStack(TerminalTabBarMixin, FocusBorderMixin, Gtk.Box):
@@ -47,7 +47,7 @@ class TerminalStack(TerminalTabBarMixin, FocusBorderMixin, Gtk.Box):
 
         # Focus border on the outer container (TerminalStack)
         self._init_focus_border()
-        focus_mgr = get_component_focus_manager()
+        focus_mgr = get_focus_manager()
         focus_mgr.register(
             self.COMPONENT_ID,
             on_focus_in=self._on_focus_in,
@@ -196,7 +196,7 @@ class TerminalStack(TerminalTabBarMixin, FocusBorderMixin, Gtk.Box):
                 self._update_tab_selection()
         except ValueError:
             pass
-        get_component_focus_manager().set_focus(self.COMPONENT_ID)
+        get_focus_manager().set_focus(self.COMPONENT_ID)
 
     def _on_panel_click(self, gesture, n_press, x, y):
         """Handle click on panel to detect which terminal was clicked (vertical mode)."""
@@ -208,7 +208,7 @@ class TerminalStack(TerminalTabBarMixin, FocusBorderMixin, Gtk.Box):
         picked_widget = self.pick(x, y, Gtk.PickFlags.DEFAULT)
         if is_button_click(picked_widget):
             return
-        fm = get_component_focus_manager()
+        fm = get_focus_manager()
         fm.set_focus(self.COMPONENT_ID)
 
         if self._vertical_mode:

@@ -1,6 +1,6 @@
 """Ansi Blows theme - based on ansi_blows.vim by Brandon Low."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 ANSI_BLOWS = Theme(
     name="ansi_blows",

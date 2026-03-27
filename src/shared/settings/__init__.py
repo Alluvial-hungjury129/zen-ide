@@ -1,7 +1,7 @@
 """Settings package for Zen IDE."""
 
 from shared.settings.default_settings import DEFAULT_SETTINGS
-from shared.settings.keybindings import KeyBindings
+from shared.settings.key_bindings import KeyBindings
 from shared.settings.settings_manager import (
     SETTINGS_BACKUP,
     SETTINGS_DIR,

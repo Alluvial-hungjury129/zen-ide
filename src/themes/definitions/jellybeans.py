@@ -1,6 +1,6 @@
 """Jellybeans theme."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 JELLYBEANS = Theme(
     name="jellybeans",

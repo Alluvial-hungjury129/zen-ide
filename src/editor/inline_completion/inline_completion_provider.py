@@ -12,7 +12,7 @@ from typing import Callable, Optional
 from gi.repository import GLib
 
 from .completion_cache import CompletionCache, CompletionProcessingMixin, _dedupe_suggestions
-from .context_gatherer import CompletionContext
+from .completion_context import CompletionContext
 from .copilot_api import CopilotAPI
 
 # Cooldown after API failure before retrying (seconds)

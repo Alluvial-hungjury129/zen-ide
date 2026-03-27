@@ -10,7 +10,7 @@ import hashlib
 import os
 from collections import OrderedDict
 
-from .context_gatherer import CompletionContext
+from .completion_context import CompletionContext
 
 
 def _dedupe_suggestions(suggestions: list[str]) -> list[str]:

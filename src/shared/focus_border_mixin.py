@@ -13,8 +13,8 @@ Usage:
             self._init_focus_border()
 
             # Register with focus manager
-            from shared.focus_manager import get_component_focus_manager
-            focus_mgr = get_component_focus_manager()
+            from shared.focus_manager import get_focus_manager
+            focus_mgr = get_focus_manager()
             focus_mgr.register(
                 self.COMPONENT_ID,
                 on_focus_in=self._on_focus_in,
@@ -68,9 +68,9 @@ class FocusBorderMixin:
 
     def _handle_panel_click_focus(self):
         """Shared panel click handler to route focus through the focus manager."""
-        from shared.focus_manager import get_component_focus_manager
+        from shared.focus_manager import get_focus_manager
 
-        get_component_focus_manager().set_focus(self.COMPONENT_ID)
+        get_focus_manager().set_focus(self.COMPONENT_ID)
 
     def _handle_panel_focus_in(self):
         """Shared focus-in handler used by panel components."""

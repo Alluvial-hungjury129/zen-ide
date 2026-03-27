@@ -57,7 +57,7 @@ make install      # Install dependencies with uv
 
 ### Source Code
 - `src/` - **Main source code**:
-  - `src/zen_ide.py` - Main application entry point
+  - `src/zen_ide_window.py` - Main application entry point
   - `src/editor/editor_view.py` - GtkSourceView-based editor
   - `src/tree_view.py` - File explorer tree
   - `src/terminal_view.py` - VTE terminal integration
@@ -96,9 +96,9 @@ One class per file, `snake_case` filenames, `PascalCase` class names matching th
 
 **Never use `cairo` or `PangoCairo` in new code.** Use the GTK4 `GtkSnapshot` API. See [docs/standards/rendering.md](docs/standards/rendering.md).
 
-### Icons - Use the Icon Manager
+### IconsManager - Use the Icon Manager
 
-**All icons via `from icons import Icons`.** Prefer Nerd Font icons. See [docs/standards/icons.md](docs/standards/icons.md).
+**All icons via `from icons import IconsManager`.** Prefer Nerd Font icons. See [docs/standards/icons.md](docs/standards/icons.md).
 
 ## Development Guidelines
 

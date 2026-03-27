@@ -5,7 +5,7 @@ import glob
 import os
 
 a = Analysis(
-    ['src/zen_ide.py'],
+    ['src/zen_ide_window.py'],
     pathex=['src'],
     binaries=[],
     datas=[

@@ -1,5 +1,6 @@
 """Tree view package — file explorer for Zen IDE."""
 
+from treeview.custom_tree_panel import CustomTreePanel
 from treeview.tree_icons import (
     CHEVRON_COLLAPSED,
     CHEVRON_COLOR,
@@ -14,7 +15,6 @@ from treeview.tree_icons import (
     get_nerd_font_name,
 )
 from treeview.tree_item import TreeItem
-from treeview.tree_panel import CustomTreePanel
 from treeview.tree_view import TreeView
 
 __all__ = [

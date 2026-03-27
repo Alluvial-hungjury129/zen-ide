@@ -1,6 +1,6 @@
 """Zengruv theme - Gruvbox with purple accents instead of orange."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 ZENGRUV = Theme(
     name="zengruv",

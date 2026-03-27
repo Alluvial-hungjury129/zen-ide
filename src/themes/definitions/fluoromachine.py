@@ -1,6 +1,6 @@
 """Fluoromachine theme - Neon retro-futuristic with heavy magenta/cyan."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 FLUOROMACHINE = Theme(
     name="fluoromachine",

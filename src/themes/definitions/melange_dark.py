@@ -1,6 +1,6 @@
 """Melange Dark theme — warm, earthy dark colorscheme by savq/melange-nvim."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 MELANGE_DARK = Theme(
     name="melange_dark",

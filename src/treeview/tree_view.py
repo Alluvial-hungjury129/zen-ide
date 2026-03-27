@@ -13,12 +13,12 @@ from gi.repository import GLib, Gtk, Pango
 from constants import PANEL_HEADER_FONT_SIZE
 from fonts import get_font_settings
 from shared.focus_border_mixin import FocusBorderMixin
-from shared.focus_manager import get_component_focus_manager
+from shared.focus_manager import get_focus_manager
 from shared.git_manager import get_git_manager
 from shared.main_thread import main_thread_call
 from themes import ThemeAwareMixin, get_theme
-from treeview.tree_panel import CustomTreePanel
-from treeview.tree_view_actions import TreeViewActionsMixin
+from treeview.custom_tree_panel import CustomTreePanel
+from treeview.tree_view_actions_mixin import TreeViewActionsMixin
 
 
 class TreeView(ThemeAwareMixin, TreeViewActionsMixin, FocusBorderMixin, Gtk.Box):
@@ -34,7 +34,7 @@ class TreeView(ThemeAwareMixin, TreeViewActionsMixin, FocusBorderMixin, Gtk.Box)
         self._init_focus_border()
 
         # Register with focus manager
-        focus_mgr = get_component_focus_manager()
+        focus_mgr = get_focus_manager()
         focus_mgr.register(
             self.COMPONENT_ID,
             on_focus_in=self._on_focus_in,
@@ -378,6 +378,6 @@ class TreeView(ThemeAwareMixin, TreeViewActionsMixin, FocusBorderMixin, Gtk.Box)
 
     def focus_tree(self):
         """Focus the tree and notify focus manager."""
-        get_component_focus_manager().set_focus(self.COMPONENT_ID)
+        get_focus_manager().set_focus(self.COMPONENT_ID)
         if hasattr(self, "tree") and hasattr(self.tree, "drawing_area"):
             self.tree.drawing_area.grab_focus()

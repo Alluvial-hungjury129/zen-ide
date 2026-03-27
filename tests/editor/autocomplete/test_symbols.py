@@ -1,6 +1,6 @@
 """Tests for symbol completions in editor/autocomplete/python_provider.py."""
 
-from editor.autocomplete.python_provider import PythonCompletionProvider
+from editor.autocomplete.python_completion_provider import PythonCompletionProvider
 from editor.autocomplete.tree_sitter_provider import (
     _find_class_node,
     _is_dataclass_node,

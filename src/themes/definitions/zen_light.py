@@ -1,6 +1,6 @@
 """Zen Light theme — primary light companion to Zen Dark."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 ZEN_LIGHT = Theme(
     name="zen_light",

@@ -37,7 +37,7 @@ class TestFontPickerDialogStructure:
         assert find_method(cls, "_apply_preview") is not None
 
     def test_has_filter_func(self):
-        tree = parse_popup_source("font_preview.py")
+        tree = parse_popup_source("font_preview_mixin.py")
         cls = find_class(tree, "FontPreviewMixin")
         assert find_method(cls, "_filter_func") is not None
 
@@ -126,7 +126,7 @@ class TestFontItemClass:
     """Verify FontItem helper class."""
 
     def test_font_item_class_exists(self):
-        tree = parse_popup_source("font_preview.py")
+        tree = parse_popup_source("font_preview_mixin.py")
         assert find_class(tree, "FontItem") is not None
 
 

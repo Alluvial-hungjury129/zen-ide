@@ -23,12 +23,12 @@ class TestGlobalSearchDialogStructure:
         assert find_method(cls, "_move_selection") is not None
 
     def test_has_search_worker(self):
-        tree = parse_popup_source("search_engine.py")
+        tree = parse_popup_source("search_engine_mixin.py")
         cls = find_class(tree, "SearchEngineMixin")
         assert find_method(cls, "_search_worker") is not None
 
     def test_has_should_skip_path(self):
-        tree = parse_popup_source("search_engine.py")
+        tree = parse_popup_source("search_engine_mixin.py")
         cls = find_class(tree, "SearchEngineMixin")
         assert find_method(cls, "_should_skip_path") is not None
 
@@ -65,11 +65,11 @@ class TestGlobalSearchDialogBinaryExtensions:
     """Test BINARY_EXTENSIONS constant."""
 
     def test_binary_extensions_is_frozenset(self):
-        source = read_popup_source("search_engine.py")
+        source = read_popup_source("search_engine_mixin.py")
         assert "frozenset" in source
 
     def test_common_binary_extensions_included(self):
-        source = read_popup_source("search_engine.py")
+        source = read_popup_source("search_engine_mixin.py")
         for ext in [".pyc", ".png", ".jpg", ".zip", ".exe", ".dll", ".so"]:
             assert f'"{ext}"' in source, f"Missing binary extension: {ext}"
 
@@ -78,7 +78,7 @@ class TestGlobalSearchDialogSearchResult:
     """Test SearchResult dataclass."""
 
     def test_search_result_class_exists(self):
-        tree = parse_popup_source("search_engine.py")
+        tree = parse_popup_source("search_engine_mixin.py")
         from tests.popups.conftest import find_class
 
         assert find_class(tree, "SearchResult") is not None
@@ -88,17 +88,17 @@ class TestGlobalSearchDialogSearchBackends:
     """Verify multiple search backends."""
 
     def test_has_git_grep_search(self):
-        tree = parse_popup_source("search_engine.py")
+        tree = parse_popup_source("search_engine_mixin.py")
         cls = find_class(tree, "SearchEngineMixin")
         assert find_method(cls, "_git_grep_search") is not None
 
     def test_has_ripgrep_search(self):
-        tree = parse_popup_source("search_engine.py")
+        tree = parse_popup_source("search_engine_mixin.py")
         cls = find_class(tree, "SearchEngineMixin")
         assert find_method(cls, "_ripgrep_search") is not None
 
     def test_has_grep_fallback(self):
-        tree = parse_popup_source("search_engine.py")
+        tree = parse_popup_source("search_engine_mixin.py")
         cls = find_class(tree, "SearchEngineMixin")
         assert find_method(cls, "_grep_search") is not None
 

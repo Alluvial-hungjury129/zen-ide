@@ -5,7 +5,7 @@ import os
 import pytest
 
 # Import the module-level constants and regex directly
-from terminal.terminal_file_navigation import (
+from terminal.terminal_file_navigation_mixin import (
     FILE_PATH_PATTERN,
     KNOWN_EXTENSIONLESS,
 )

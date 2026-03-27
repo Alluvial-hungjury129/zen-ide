@@ -1,6 +1,6 @@
 """Synthwave '84 theme - Neon magenta, cyan, yellow on dark purple; pure 80s synthwave."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 SYNTHWAVE84 = Theme(
     name="synthwave84",

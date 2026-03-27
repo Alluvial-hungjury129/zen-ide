@@ -1,6 +1,6 @@
 """Tests for PythonNavigationMixin — pure parsing logic (no GTK)."""
 
-from navigation.code_navigation_py import PythonNavigationMixin
+from navigation.python_navigation_mixin import PythonNavigationMixin
 
 
 # Create a minimal instance to call the methods

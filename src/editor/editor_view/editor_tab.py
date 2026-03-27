@@ -10,12 +10,12 @@ from themes import get_theme
 
 from ..color_preview_renderer import ColorPreviewRenderer
 from ..semantic_highlight import setup_semantic_highlight
-from .config import EditorTabConfigMixin
 from .core import _iter_at_line, _iter_at_line_offset
-from .hover import EditorTabHoverMixin
-from .input import EditorTabInputMixin
-from .source_view import ZenSourceView
-from .theme import EditorTabThemeMixin
+from .editor_tab_config_mixin import EditorTabConfigMixin
+from .editor_tab_hover_mixin import EditorTabHoverMixin
+from .editor_tab_input_mixin import EditorTabInputMixin
+from .editor_tab_theme_mixin import EditorTabThemeMixin
+from .zen_source_view import ZenSourceView
 
 
 class EditorTab(EditorTabInputMixin, EditorTabHoverMixin, EditorTabThemeMixin, EditorTabConfigMixin):
@@ -60,7 +60,7 @@ class EditorTab(EditorTabInputMixin, EditorTabHoverMixin, EditorTabThemeMixin, E
         setup_semantic_highlight(self, get_theme())
 
         # Tree-sitter parse tree cache (incremental updates for semantic features)
-        from ..tree_sitter_buffer import setup_buffer_cache
+        from ..tree_sitter_buffer_cache import setup_buffer_cache
 
         setup_buffer_cache(self)
 

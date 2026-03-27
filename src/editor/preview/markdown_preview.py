@@ -20,7 +20,7 @@ from editor.preview.markdown_scroll_sync import MarkdownScrollSyncMixin
 from editor.preview.preview_scroll_mixin import SCROLL_SYNC_JS, PreviewScrollMixin
 from gi_requirements import load_webkit
 from themes import ThemeAwareMixin, get_theme
-from themes.theme_manager import get_setting
+from themes.theme_aware_mixin import get_setting
 
 # --- Backend detection ---
 

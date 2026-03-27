@@ -1,6 +1,6 @@
 """ZX Dreams — ZX Spectrum inspired palette."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 ZX_DREAMS = Theme(
     name="zx_dreams",

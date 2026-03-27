@@ -86,7 +86,7 @@ def show_confirm(
 ):
     """Show a confirmation dialog and return it."""
     from popups.nvim_popup import show_popup
-    from popups.system_dialogs import system_confirm
+    from popups.system_command_palette_dialog import system_confirm
 
     return show_popup(
         ConfirmDialog,

@@ -17,7 +17,7 @@ from pathlib import Path
 from gi.repository import Gdk, GLib, Gtk
 
 from constants import AUTOCOMPLETE_AUTO_TRIGGER_CHARS, AUTOCOMPLETE_AUTO_TRIGGER_DELAY_MS
-from icons import Icons
+from icons import IconsManager
 from shared.settings import get_setting
 
 
@@ -33,14 +33,14 @@ class CompletionKind(PyEnum):
 
 
 COMPLETION_ICONS = {
-    CompletionKind.FUNCTION: Icons.KIND_FUNCTION,
-    CompletionKind.CLASS: Icons.KIND_CLASS,
-    CompletionKind.PROPERTY: Icons.KIND_PROPERTY,
-    CompletionKind.KEYWORD: Icons.KIND_KEYWORD,
-    CompletionKind.BUILTIN: Icons.KIND_BUILTIN,
-    CompletionKind.SNIPPET: Icons.KIND_SNIPPET,
-    CompletionKind.VARIABLE: Icons.KIND_VARIABLE,
-    CompletionKind.PARAMETER: Icons.KIND_PARAMETER,
+    CompletionKind.FUNCTION: IconsManager.KIND_FUNCTION,
+    CompletionKind.CLASS: IconsManager.KIND_CLASS,
+    CompletionKind.PROPERTY: IconsManager.KIND_PROPERTY,
+    CompletionKind.KEYWORD: IconsManager.KIND_KEYWORD,
+    CompletionKind.BUILTIN: IconsManager.KIND_BUILTIN,
+    CompletionKind.SNIPPET: IconsManager.KIND_SNIPPET,
+    CompletionKind.VARIABLE: IconsManager.KIND_VARIABLE,
+    CompletionKind.PARAMETER: IconsManager.KIND_PARAMETER,
 }
 
 
@@ -60,9 +60,9 @@ class Autocomplete:
     # We pull in methods from the two mixin modules after class creation (see bottom of file).
 
     def __init__(self, editor_tab):
-        from editor.autocomplete.js_provider import JsCompletionProvider
-        from editor.autocomplete.python_provider import PythonCompletionProvider
-        from editor.autocomplete.terraform_provider import TerraformCompletionProvider
+        from editor.autocomplete.js_completion_provider import JsCompletionProvider
+        from editor.autocomplete.python_completion_provider import PythonCompletionProvider
+        from editor.autocomplete.terraform_completion_provider import TerraformCompletionProvider
 
         self._tab = editor_tab
         self._view = editor_tab.view
@@ -473,8 +473,8 @@ def _apply_mixins():
     This avoids multiple-inheritance MRO issues while keeping the
     public class name and import paths unchanged.
     """
-    from editor.autocomplete.completion_popup import CompletionPopupMixin
-    from editor.autocomplete.completion_ranking import CompletionRankingMixin
+    from editor.autocomplete.completion_popup_mixin import CompletionPopupMixin
+    from editor.autocomplete.completion_ranking_mixin import CompletionRankingMixin
 
     for mixin_cls in (CompletionPopupMixin, CompletionRankingMixin):
         for name in dir(mixin_cls):

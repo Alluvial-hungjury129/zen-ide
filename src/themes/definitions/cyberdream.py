@@ -1,6 +1,6 @@
 """Cyberdream theme - High-contrast cyan/magenta/green on near-black."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 CYBERDREAM = Theme(
     name="cyberdream",

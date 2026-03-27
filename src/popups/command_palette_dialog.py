@@ -228,7 +228,7 @@ def show_command_palette(
 ):
     """Show a command palette and return it."""
     from popups.nvim_popup import show_popup
-    from popups.system_dialogs import SystemCommandPaletteDialog
+    from popups.system_command_palette_dialog import SystemCommandPaletteDialog
 
     return show_popup(
         CommandPaletteDialog,

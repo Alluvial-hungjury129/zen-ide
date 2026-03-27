@@ -1,6 +1,6 @@
 """Zen Style theme."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 ZEN_STYLE = Theme(
     name="zen_style",

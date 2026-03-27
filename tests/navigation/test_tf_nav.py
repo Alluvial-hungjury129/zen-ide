@@ -5,7 +5,7 @@ Covers:
 - _find_venv_site_packages edge cases
 """
 
-from navigation.code_navigation_py import PythonNavigationMixin
+from navigation.python_navigation_mixin import PythonNavigationMixin
 
 
 class _Stub(PythonNavigationMixin):

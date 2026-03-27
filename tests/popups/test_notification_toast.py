@@ -43,10 +43,10 @@ class TestNotificationToastIconMapping:
     """Test level-to-icon mapping."""
 
     EXPECTED_ICON_REFS = {
-        "info": "Icons.INFO",
-        "success": "Icons.SUCCESS",
-        "warning": "Icons.WARNING",
-        "error": "Icons.ERROR",
+        "info": "IconsManager.INFO",
+        "success": "IconsManager.SUCCESS",
+        "warning": "IconsManager.WARNING",
+        "error": "IconsManager.ERROR",
     }
 
     def test_all_levels_have_icons(self):

@@ -272,7 +272,7 @@ class TestTypeScriptParams:
 @needs_ts
 class TestBufferCache:
     def test_cache_reuse(self):
-        from editor.tree_sitter_buffer import TreeSitterBufferCache
+        from editor.tree_sitter_buffer_cache import TreeSitterBufferCache
 
         cache = TreeSitterBufferCache()
         code = "x = 1"
@@ -281,7 +281,7 @@ class TestBufferCache:
         assert t1 is t2  # Same object — no reparse
 
     def test_dirty_reparse(self):
-        from editor.tree_sitter_buffer import TreeSitterBufferCache
+        from editor.tree_sitter_buffer_cache import TreeSitterBufferCache
 
         cache = TreeSitterBufferCache()
         code1 = "x = 1"
@@ -292,7 +292,7 @@ class TestBufferCache:
         assert t1 is not t2
 
     def test_invalidate(self):
-        from editor.tree_sitter_buffer import TreeSitterBufferCache
+        from editor.tree_sitter_buffer_cache import TreeSitterBufferCache
 
         cache = TreeSitterBufferCache()
         cache.get_tree("x = 1", "python")
@@ -300,7 +300,7 @@ class TestBufferCache:
         assert cache._tree is None
 
     def test_incremental_parse(self):
-        from editor.tree_sitter_buffer import TreeSitterBufferCache
+        from editor.tree_sitter_buffer_cache import TreeSitterBufferCache
 
         cache = TreeSitterBufferCache()
         code1 = "x = 1\ny = 2\n"

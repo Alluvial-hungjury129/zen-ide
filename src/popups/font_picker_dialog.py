@@ -8,7 +8,7 @@ from typing import Callable, Dict, Optional, Tuple
 from gi.repository import Gdk, GLib, Gtk
 
 from fonts import get_font_settings
-from popups.font_preview import FontPreviewMixin
+from popups.font_preview_mixin import FontPreviewMixin
 from popups.nvim_context_menu import show_context_menu
 from popups.nvim_popup import NvimPopup
 

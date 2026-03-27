@@ -6,7 +6,7 @@ from typing import Optional
 
 from gi.repository import Gdk, Gtk
 
-from shared.system_monitor import SystemMonitorPanel
+from shared.system_monitor_panel import SystemMonitorPanel
 from themes import get_theme
 
 

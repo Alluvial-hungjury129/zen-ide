@@ -1,6 +1,6 @@
 """Everforest Light theme."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 EVERFOREST_LIGHT = Theme(
     name="everforest_light",

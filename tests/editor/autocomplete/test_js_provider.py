@@ -1,6 +1,6 @@
 """Tests for editor/autocomplete/js_provider.py - JS/TS completions."""
 
-from editor.autocomplete.js_provider import JsCompletionProvider
+from editor.autocomplete.js_completion_provider import JsCompletionProvider
 
 
 class TestGetImports:

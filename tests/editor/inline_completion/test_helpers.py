@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from editor.inline_completion.context_gatherer import CompletionContext
+from editor.inline_completion.completion_context import CompletionContext
 from editor.inline_completion.inline_completion_manager import InlineCompletionManager
 
 

@@ -64,7 +64,7 @@ def register_resource_fonts() -> None:
     Uses fontconfig on all platforms (including macOS).  Fonts stay
     app-scoped — never installed system-wide.
 
-    If the early background thread (zen_ide.py) already registered fonts via
+    If the early background thread (zen_ide_window.py) already registered fonts via
     fontconfig before Gtk.init(), its ``_fonts_preregistered`` flag is checked
     first (zero-cost).  Falls back to Pango font map enumeration if the flag
     is unavailable, and re-registers from .ttf files on disk as a last resort.
@@ -76,9 +76,9 @@ def register_resource_fonts() -> None:
 
     # Fast path: early thread already registered fonts via fontconfig.
     try:
-        import zen_ide
+        import zen_ide_window
 
-        if zen_ide._fonts_preregistered:
+        if zen_ide_window._fonts_preregistered:
             return
     except (ImportError, AttributeError):
         pass

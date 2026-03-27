@@ -1,7 +1,7 @@
 """Tests for theme definitions registry."""
 
+from themes.theme import Theme
 from themes.theme_definitions import THEMES
-from themes.theme_model import Theme
 
 
 class TestThemeDefinitions:

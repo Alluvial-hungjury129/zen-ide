@@ -1,6 +1,6 @@
 """One Dark theme."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 ONE_DARK = Theme(
     name="one_dark",

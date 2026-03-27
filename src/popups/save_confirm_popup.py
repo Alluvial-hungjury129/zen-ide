@@ -94,7 +94,7 @@ def show_save_confirm(
 ):
     """Show a save confirmation popup."""
     from popups.nvim_popup import show_popup
-    from popups.system_dialogs import system_save_confirm
+    from popups.system_command_palette_dialog import system_save_confirm
 
     return show_popup(
         SaveConfirmPopup,

@@ -12,8 +12,8 @@ from gi.repository import Gdk, Gtk
 
 from fonts import get_font_settings
 from popups.border_overlay import _BorderOverlay
-from popups.popup_anchor import PopupAnchorMixin
-from popups.popup_styles import PopupStylesMixin
+from popups.popup_anchor_mixin import PopupAnchorMixin
+from popups.popup_styles_mixin import PopupStylesMixin
 from shared.ui import ZenButton
 from themes import subscribe_theme_change, unsubscribe_theme_change
 
@@ -484,7 +484,7 @@ def show_popup(nvim_cls, system_fallback, parent, *args, **kwargs):
     Returns:
         The dialog instance, or None for system-function fallbacks.
     """
-    from popups.system_dialogs import is_nvim_mode
+    from popups.system_command_palette_dialog import is_nvim_mode
 
     if not is_nvim_mode():
         result = system_fallback(parent, *args, **kwargs)

@@ -6,16 +6,16 @@ from typing import Callable
 from gi.repository import GLib, Gtk
 
 from shared.focus_border_mixin import FocusBorderMixin
-from shared.focus_manager import get_component_focus_manager
+from shared.focus_manager import get_focus_manager
 from themes import subscribe_theme_change
 
 from . import SKETCH_EXTENSION
 from .core import _iter_at_line, _iter_at_line_offset
 from .editor_tab import EditorTab
-from .file_openers import EditorViewFileOpenersMixin
-from .find import EditorViewFindMixin
-from .scroll import EditorViewScrollMixin
-from .tabs import EditorViewTabsMixin
+from .editor_view_file_openers_mixin import EditorViewFileOpenersMixin
+from .editor_view_find_mixin import EditorViewFindMixin
+from .editor_view_scroll_mixin import EditorViewScrollMixin
+from .editor_view_tabs_mixin import EditorViewTabsMixin
 
 
 class EditorView(
@@ -32,7 +32,7 @@ class EditorView(
         self._init_focus_border()
 
         # Register with focus manager
-        focus_mgr = get_component_focus_manager()
+        focus_mgr = get_focus_manager()
         focus_mgr.register(
             self.COMPONENT_ID,
             on_focus_in=self._on_focus_in,

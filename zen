@@ -26,7 +26,7 @@ venv_python = os.path.join(project_dir, '.venv', 'bin', 'python3')
 # Don't wait: returns the shell prompt immediately (like `code`, `subl`)
 # and avoids terminal-title pollution and freeze-on-quit.
 subprocess.Popen(
-    [venv_python, os.path.join(src_dir, 'zen_ide.py')] + sys.argv[1:],
+    [venv_python, os.path.join(src_dir, 'zen_ide_window.py')] + sys.argv[1:],
     env=env,
     stdin=subprocess.DEVNULL,
     stdout=subprocess.DEVNULL,

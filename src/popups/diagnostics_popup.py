@@ -9,7 +9,7 @@ import os
 
 from gi.repository import Gdk, Gtk
 
-from icons import ICON_FONT_FAMILY, Icons
+from icons import ICON_FONT_FAMILY, IconsManager
 from popups.nvim_popup import NvimPopup
 from shared.diagnostics_manager import Diagnostic, get_diagnostics_manager
 from themes import get_theme
@@ -60,9 +60,13 @@ class DiagnosticsPopup(NvimPopup):
 
             # Severity icon
             if diag.severity == "error":
-                icon_markup = f'<span font_family="{ICON_FONT_FAMILY}" foreground="{err_color}">{Icons.ERROR_X}</span>'
+                icon_markup = (
+                    f'<span font_family="{ICON_FONT_FAMILY}" foreground="{err_color}">{IconsManager.ERROR_X}</span>'
+                )
             else:
-                icon_markup = f'<span font_family="{ICON_FONT_FAMILY}" foreground="{warn_color}">{Icons.WARNING}</span>'
+                icon_markup = (
+                    f'<span font_family="{ICON_FONT_FAMILY}" foreground="{warn_color}">{IconsManager.WARNING}</span>'
+                )
             icon_label = Gtk.Label()
             icon_label.set_use_markup(True)
             icon_label.set_markup(icon_markup)
@@ -216,9 +220,13 @@ class WorkspaceDiagnosticsPopup(NvimPopup):
 
             # Severity icon
             if diag.severity == "error":
-                icon_markup = f'<span font_family="{ICON_FONT_FAMILY}" foreground="{err_color}">{Icons.ERROR_X}</span>'
+                icon_markup = (
+                    f'<span font_family="{ICON_FONT_FAMILY}" foreground="{err_color}">{IconsManager.ERROR_X}</span>'
+                )
             else:
-                icon_markup = f'<span font_family="{ICON_FONT_FAMILY}" foreground="{warn_color}">{Icons.WARNING}</span>'
+                icon_markup = (
+                    f'<span font_family="{ICON_FONT_FAMILY}" foreground="{warn_color}">{IconsManager.WARNING}</span>'
+                )
             icon_label = Gtk.Label()
             icon_label.set_use_markup(True)
             icon_label.set_markup(icon_markup)

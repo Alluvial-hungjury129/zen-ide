@@ -1,6 +1,6 @@
 """Tests for keybindings module."""
 
-from shared.settings.keybindings import KeyBindings
+from shared.settings.key_bindings import KeyBindings
 
 
 class TestKeyBindingsGtk:

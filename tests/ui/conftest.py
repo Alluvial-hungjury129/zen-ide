@@ -49,7 +49,7 @@ def zen_app(gtk_init):
 
     Yields the app, then cleans up.
     """
-    from zen_ide import ZenIDEApp
+    from zen_ide_window import ZenIDEApp
 
     app = ZenIDEApp()
     yield app
@@ -77,7 +77,7 @@ def zen_window(zen_app, tmp_path_factory):
     os.environ["ZEN_WORKSPACE"] = str(tmp_path)
     os.environ.setdefault("ZEN_SUPPRESS_GTK_WARNINGS", "1")
 
-    from zen_ide import ZenIDEWindow
+    from zen_ide_window import ZenIDEWindow
 
     win = ZenIDEWindow(zen_app)
 

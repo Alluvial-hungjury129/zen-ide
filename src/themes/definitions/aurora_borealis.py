@@ -1,6 +1,6 @@
 """Aurora Borealis theme — inspired by the northern lights."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 AURORA_BOREALIS = Theme(
     name="aurora_borealis",

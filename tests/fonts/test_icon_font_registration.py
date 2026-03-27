@@ -126,11 +126,11 @@ class TestPangoBackendSetting:
     def test_read_pango_backend_returns_auto_when_no_settings(self, tmp_path):
         """Returns 'auto' when settings.json doesn't exist."""
         # Import after patching to get a clean module
-        import zen_ide
+        import zen_ide_window
 
         with patch.dict(os.environ, {"HOME": str(tmp_path)}, clear=False):
             # Reload to pick up patched HOME
-            result = zen_ide._read_pango_backend()
+            result = zen_ide_window._read_pango_backend()
             # Should return 'auto' (default) when no settings file
             assert result == "auto"
 
@@ -138,7 +138,7 @@ class TestPangoBackendSetting:
         """Returns 'freetype' when configured in settings.json."""
         import json
 
-        import zen_ide
+        import zen_ide_window
 
         # Create settings with freetype backend
         zen_dir = tmp_path / ".zen_ide"
@@ -147,14 +147,14 @@ class TestPangoBackendSetting:
         (zen_dir / "settings.json").write_text(json.dumps(settings))
 
         with patch.dict(os.environ, {"HOME": str(tmp_path)}, clear=False):
-            result = zen_ide._read_pango_backend()
+            result = zen_ide_window._read_pango_backend()
             assert result == "freetype"
 
     def test_read_pango_backend_returns_coretext(self, tmp_path):
         """Returns 'coretext' when configured in settings.json."""
         import json
 
-        import zen_ide
+        import zen_ide_window
 
         zen_dir = tmp_path / ".zen_ide"
         zen_dir.mkdir()
@@ -162,7 +162,7 @@ class TestPangoBackendSetting:
         (zen_dir / "settings.json").write_text(json.dumps(settings))
 
         with patch.dict(os.environ, {"HOME": str(tmp_path)}, clear=False):
-            result = zen_ide._read_pango_backend()
+            result = zen_ide_window._read_pango_backend()
             assert result == "coretext"
 
 
@@ -230,33 +230,33 @@ class TestEarlyFontRegistrationSkipsFreeType:
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
     def test_early_registration_skipped_for_freetype(self):
         """_register_fonts_early() should skip CoreText when using freetype."""
-        import zen_ide
+        import zen_ide_window
 
         # Mock _read_pango_backend to return freetype
-        with patch.object(zen_ide, "_read_pango_backend", return_value="freetype"):
+        with patch.object(zen_ide_window, "_read_pango_backend", return_value="freetype"):
             # Reset the flag
-            zen_ide._fonts_preregistered = False
+            zen_ide_window._fonts_preregistered = False
 
             # Call the function
-            zen_ide._register_fonts_early()
+            zen_ide_window._register_fonts_early()
 
             # Should NOT have registered (skipped due to freetype)
-            assert zen_ide._fonts_preregistered is False
+            assert zen_ide_window._fonts_preregistered is False
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS only")
     def test_early_registration_runs_for_coretext(self):
         """_register_fonts_early() should run CoreText registration for auto/coretext."""
-        import zen_ide
+        import zen_ide_window
 
         # Mock _read_pango_backend to return auto (default)
-        with patch.object(zen_ide, "_read_pango_backend", return_value="auto"):
+        with patch.object(zen_ide_window, "_read_pango_backend", return_value="auto"):
             # The actual registration may or may not succeed depending on state,
             # but the function should at least attempt it (not early-return)
             # We can verify by checking it doesn't skip due to freetype check
-            zen_ide._fonts_preregistered = False
+            zen_ide_window._fonts_preregistered = False
 
             # This should attempt registration (not skip)
             # We can't easily verify CoreText calls without more mocking,
             # but we can verify the function completes without error
-            zen_ide._register_fonts_early()
+            zen_ide_window._register_fonts_early()
             # No assertion needed - just verifying no exception is raised

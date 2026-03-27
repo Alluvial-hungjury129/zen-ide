@@ -15,7 +15,7 @@ import re
 from gi.repository import GLib, Gtk, Vte
 
 from ai.cli_provider import CliProviderMixin
-from terminal.terminal_jog_wheel import JogWheelScrollbarMixin
+from terminal.jog_wheel_scrollbar_mixin import JogWheelScrollbarMixin
 from terminal.terminal_view import TerminalView
 
 

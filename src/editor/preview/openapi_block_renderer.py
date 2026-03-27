@@ -12,7 +12,7 @@ import json
 import re
 
 from editor.preview.content_block import ContentBlock, InlineSpan
-from icons import Icons
+from icons import IconsManager
 
 _BACKTICK_RE = re.compile(r"`([^`]+)`")
 
@@ -192,7 +192,7 @@ class OpenAPIBlockRenderer:
                         loc = p.get("in", "?")
                         schema = p.get("schema", {})
                         ptype = _schema_summary(schema, spec) or schema.get("type", "any")
-                        required = Icons.SUCCESS if p.get("required") else ""
+                        required = IconsManager.SUCCESS if p.get("required") else ""
                         pdesc = p.get("description", "")
                         rows.append([name, loc, ptype, required, pdesc])
                     if rows:
@@ -337,7 +337,7 @@ class OpenAPIBlockRenderer:
             for name, type_str, required, desc in rows:
                 depth = name.count(".")
                 if depth == 0:
-                    req_mark = Icons.SUCCESS if required else ""
+                    req_mark = IconsManager.SUCCESS if required else ""
                     top_table_rows.append([name, type_str, req_mark, desc])
                 else:
                     top_parent = name.split(".")[0]
@@ -365,7 +365,7 @@ class OpenAPIBlockRenderer:
                     indent_level = rel_name.count(".")
                     indent_pad = "  " * indent_level
                     toggle = "▸ " if name in nested_parent_set else ""
-                    req_mark = Icons.SUCCESS if required else ""
+                    req_mark = IconsManager.SUCCESS if required else ""
                     child_table_rows.append([f"{indent_pad}{toggle}{display_name}", type_str, req_mark, desc])
 
                 child_table = ContentBlock(kind="table", source_line=line, headers=child_headers, rows=child_table_rows)

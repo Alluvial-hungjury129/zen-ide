@@ -5,7 +5,7 @@ UNAME_S := $(shell uname -s)
 PYTHON  = .venv/bin/python3
 COMPILE = @$(PYTHON) -m compileall -q src 2>/dev/null || true
 RUN_ENV = $(DYLD_ENV) PYTHON_JIT=1 PYTHONPATH=..:$$PYTHONPATH
-IDE_CMD = $(CURDIR)/$(PYTHON) zen_ide.py
+IDE_CMD = $(CURDIR)/$(PYTHON) zen_ide_window.py
 APP_NAME    := Zen IDE
 APP_BUNDLE  := dist/$(APP_NAME).app
 APP_ID      := com.zen-ide.app

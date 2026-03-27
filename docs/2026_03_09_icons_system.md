@@ -1,4 +1,4 @@
-# Icons System
+# IconsManager System
 
 **Created_at:** 2026-03-09  
 **Updated_at:** 2026-03-09  
@@ -10,7 +10,7 @@
 
 ## Overview
 
-Zen IDE uses a centralised icon system built on **Nerd Fonts**. All UI icons — buttons, context menus, notifications, file-type indicators, autocomplete kinds, and sketch pad tools — are defined as named constants in a single `Icons` class. Components import these constants instead of hardcoding Unicode code-points.
+Zen IDE uses a centralised icon system built on **Nerd Fonts**. All UI icons — buttons, context menus, notifications, file-type indicators, autocomplete kinds, and sketch pad tools — are defined as named constants in a single `IconsManager` class. Components import these constants instead of hardcoding Unicode code-points.
 
 The system has two layers:
 
@@ -28,7 +28,7 @@ The global layer (`icon_manager.py`) imports the color palette from the tree lay
 ```
 src/icons/
 ├── __init__.py          # Public API (re-exports)
-└── icon_manager.py      # Icons class, file lookup, label helper
+└── icon_manager.py      # IconsManager class, file lookup, label helper
 
 src/treeview/
 └── tree_icons.py        # Tree icons, emoji fallback, ICON_COLORS, git status
@@ -50,7 +50,7 @@ get_file_icon("main.py")
   1. Check workspace extensions (constants.WORKSPACE_EXTENSIONS)
   2. Check _FILE_NAME_MAP by filename
   3. Check _FILE_ICON_MAP by extension
-  4. Fallback → Icons.FILE_DEFAULT
+  4. Fallback → IconsManager.FILE_DEFAULT
     ↓
   Color lookup from tree_icons.ICON_COLORS
     ↓
@@ -64,12 +64,12 @@ get_file_icon("main.py")
 All imports go through `src/icons/__init__.py`:
 
 ```python
-from icons import Icons, create_icon_label, get_file_icon, ICON_SIZE_CSS_CLASS
+from icons import IconsManager, create_icon_label, get_file_icon, ICON_SIZE_CSS_CLASS
 ```
 
 | Export | Type | Description |
 |--------|------|-------------|
-| `Icons` | class | Named constants for every icon |
+| `IconsManager` | class | Named constants for every icon |
 | `get_file_icon(path)` | function | Returns `(icon_char, hex_color)` for a file path |
 | `create_icon_label(icon, size_pt)` | function | Creates a consistently-sized `Gtk.Label` |
 | `ICON_SIZE_CSS_CLASS` | str | CSS class `"zen-icon"` applied to all icon labels |
@@ -78,7 +78,7 @@ from icons import Icons, create_icon_label, get_file_icon, ICON_SIZE_CSS_CLASS
 
 ## Icon Constants
 
-The `Icons` class contains **~110 named constants** grouped by category. Each value is a single Unicode character — either a Nerd Font code-point or a standard Unicode symbol.
+The `IconsManager` class contains **~110 named constants** grouped by category. Each value is a single Unicode character — either a Nerd Font code-point or a standard Unicode symbol.
 
 ### Actions (buttons & context menus)
 
@@ -200,7 +200,7 @@ Resolution priority:
 1. **Workspace extensions** — if the file ends with a workspace extension (from `constants.WORKSPACE_EXTENSIONS`), returns `(FILE_WORKSPACE, default_color)`
 2. **Filename match** — case-insensitive lookup in `_FILE_NAME_MAP` (6 entries: `dockerfile`, `makefile`, `cmakelists.txt`, `license`, `.gitignore`, `.env`)
 3. **Extension match** — lookup in `_FILE_ICON_MAP` (~65 extensions)
-4. **Fallback** — `Icons.FILE_DEFAULT`
+4. **Fallback** — `IconsManager.FILE_DEFAULT`
 
 ### Color resolution
 
@@ -244,13 +244,13 @@ Creates a `Gtk.Label` with consistent icon sizing:
 4. Applies `Pango.attr_size_new(size_pt * Pango.SCALE)`
 
 ```python
-from icons import Icons, create_icon_label
+from icons import IconsManager, create_icon_label
 
 # Auto-size (editor font size + 3pt)
-label = create_icon_label(Icons.FILE_PYTHON)
+label = create_icon_label(IconsManager.FILE_PYTHON)
 
 # Explicit size
-label = create_icon_label(Icons.PLUS, size_pt=16)
+label = create_icon_label(IconsManager.PLUS, size_pt=16)
 ```
 
 ---
@@ -310,7 +310,7 @@ When Nerd Font is unavailable (e.g., Windows without manual install), the tree v
 
 ## Tree View Icon System
 
-The tree view has its own icon layer in `src/treeview/tree_icons.py` that wraps the global `Icons` system with:
+The tree view has its own icon layer in `src/treeview/tree_icons.py` that wraps the global `IconsManager` system with:
 
 - **Emoji fallback** — `EMOJI_FILE_ICONS` dict for systems without Nerd Fonts
 - **Nerd Font detection** — `get_nerd_font_name()` checks for 12 known Nerd Font variants
@@ -328,10 +328,10 @@ Returns the appropriate icon set based on Nerd Font availability. Used by `tree_
 ### Direct icon constants (buttons)
 
 ```python
-from icons import Icons
+from icons import IconsManager
 
-btn = Gtk.Button(label=Icons.PLUS)
-clear_btn = Gtk.Button(label=Icons.TRASH)
+btn = Gtk.Button(label=IconsManager.PLUS)
+clear_btn = Gtk.Button(label=IconsManager.TRASH)
 ```
 
 ### File icon lookup (status bar)
@@ -346,33 +346,33 @@ icon, color = get_file_icon("/path/to/file.py")
 ### Styled icon label (consistent sizing)
 
 ```python
-from icons import Icons, create_icon_label
+from icons import IconsManager, create_icon_label
 
-label = create_icon_label(Icons.FILE_PYTHON, size_pt=14)
+label = create_icon_label(IconsManager.FILE_PYTHON, size_pt=14)
 ```
 
 ### Autocomplete kind icons
 
 ```python
-from icons import Icons
+from icons import IconsManager
 
 COMPLETION_ICONS = {
-    CompletionKind.FUNCTION: Icons.KIND_FUNCTION,   # ƒ
-    CompletionKind.CLASS: Icons.KIND_CLASS,           # ◆
-    CompletionKind.VARIABLE: Icons.KIND_VARIABLE,    # ν
+    CompletionKind.FUNCTION: IconsManager.KIND_FUNCTION,   # ƒ
+    CompletionKind.CLASS: IconsManager.KIND_CLASS,           # ◆
+    CompletionKind.VARIABLE: IconsManager.KIND_VARIABLE,    # ν
 }
 ```
 
 ### Toast notifications
 
 ```python
-from icons import Icons
+from icons import IconsManager
 
 icon_map = {
-    "info": Icons.INFO,       # ℹ
-    "success": Icons.SUCCESS, # ✓
-    "warning": Icons.WARNING, # ⚠
-    "error": Icons.ERROR,     # ✗
+    "info": IconsManager.INFO,       # ℹ
+    "success": IconsManager.SUCCESS, # ✓
+    "warning": IconsManager.WARNING, # ⚠
+    "error": IconsManager.ERROR,     # ✗
 }
 ```
 
@@ -380,10 +380,10 @@ icon_map = {
 
 ## Consumers
 
-| Component | File | Icons used |
+| Component | File | IconsManager used |
 |-----------|------|------------|
 | Status bar | `src/main/status_bar.py` | `get_file_icon()` for file type + color |
-| Tree view | `src/treeview/tree_panel.py` | `get_icon_set()`, `Icons.FILE`, chevrons |
+| Tree view | `src/treeview/tree_panel.py` | `get_icon_set()`, `IconsManager.FILE`, chevrons |
 | Tree view renderer | `src/treeview/tree_panel_renderer.py` | `ICON_COLORS`, `get_git_status_colors()` |
 | Tree actions | `src/treeview/tree_view_actions.py` | Action icons (copy, paste, delete, etc.) |
 | Autocomplete | `src/editor/autocomplete/autocomplete.py` | `KIND_*` icons |
@@ -404,17 +404,17 @@ icon_map = {
 ## Adding a New Icon
 
 1. **Find the glyph** at [nerdfonts.com/cheat-sheet](https://www.nerdfonts.com/cheat-sheet)
-2. **Add the constant** to the appropriate category in `Icons` class (`src/icons/icon_manager.py`)
+2. **Add the constant** to the appropriate category in `IconsManager` class (`src/icons/icon_manager.py`)
 3. **If it's a file-type icon**, also add the extension mapping to `_FILE_ICON_MAP` and optionally to `NERD_FILE_ICONS` in `tree_icons.py`
 4. **If it needs a color**, add the extension entry to `ICON_COLORS` in `tree_icons.py`
-5. **Use it** via `from icons import Icons` — never hardcode the Unicode value
+5. **Use it** via `from icons import IconsManager` — never hardcode the Unicode value
 
 ```python
 # In icon_manager.py
-class Icons:
+class IconsManager:
     MY_NEW_ICON = "\uf123"  # nf-fa-something
 
 # In your component
-from icons import Icons
-btn = Gtk.Button(label=Icons.MY_NEW_ICON)
+from icons import IconsManager
+btn = Gtk.Button(label=IconsManager.MY_NEW_ICON)
 ```

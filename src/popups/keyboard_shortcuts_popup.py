@@ -5,7 +5,7 @@ Keyboard Shortcuts popup for Zen IDE.
 from gi.repository import Gdk, Gtk
 
 from popups.nvim_popup import NvimPopup
-from shared.settings.keybindings import KeyBindings
+from shared.settings.key_bindings import KeyBindings
 
 
 class KeyboardShortcutsPopup(NvimPopup):

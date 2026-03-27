@@ -241,11 +241,11 @@ def show_context_menu(
         source_widget: Optional widget where the click originated (for positioning)
         title: Optional title for the menu
     """
-    from popups.system_dialogs import is_nvim_mode
+    from popups.system_command_palette_dialog import is_nvim_mode
 
     nvim = is_nvim_mode()
     if not nvim:
-        from popups.system_dialogs import SystemContextMenu
+        from popups.system_command_palette_dialog import SystemContextMenu
 
         menu = SystemContextMenu(parent, items, on_select, x, y, source_widget, title=title)
         menu.present()

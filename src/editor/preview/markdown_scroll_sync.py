@@ -11,7 +11,7 @@ from pathlib import Path
 
 from gi.repository import GLib, Gtk
 
-from themes.theme_manager import get_setting
+from themes.theme_aware_mixin import get_setting
 
 # macOS native WKWebView symbols (conditionally imported)
 _NSURL = _NSApp = _NSMakeRect = _ScrollHandler = _WKWebView = _WKWebViewConfig = None

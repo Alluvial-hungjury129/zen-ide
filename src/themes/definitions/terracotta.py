@@ -3,7 +3,7 @@ Terracotta — a warm, earthy dark theme inspired by sun-baked clay,
 Mediterranean pottery, and desert landscapes.
 """
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 TERRACOTTA = Theme(
     name="terracotta",

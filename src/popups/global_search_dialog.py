@@ -10,7 +10,7 @@ from gi.repository import Gdk, GLib, Gtk, Pango
 
 from icons import get_file_icon
 from popups.nvim_popup import NvimPopup
-from popups.search_engine import SearchEngineMixin, SearchResult
+from popups.search_engine_mixin import SearchEngineMixin, SearchResult
 from popups.selection_dialog import show_selection
 from shared.settings import get_setting
 

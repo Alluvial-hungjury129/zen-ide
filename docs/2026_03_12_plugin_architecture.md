@@ -331,9 +331,9 @@ ai_chat.on_response_update = window._on_ai_response_update
 **File:** `src/shared/focus_manager.py`
 
 ```python
-from shared.focus_manager import get_component_focus_manager
+from shared.focus_manager import get_focus_manager
 
-focus_mgr = get_component_focus_manager()
+focus_mgr = get_focus_manager()
 focus_mgr.set_focus("editor")      # Set focus
 current = focus_mgr.get_focus()    # Get current focus
 focus_mgr.subscribe(callback)      # Listen for focus changes

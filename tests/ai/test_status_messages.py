@@ -269,8 +269,8 @@ class TestVirtualScrollbarOverlay:
         view._vscroll_hide_id = 17
 
         with (
-            patch("terminal.terminal_jog_wheel.GLib.source_remove") as mock_remove,
-            patch("terminal.terminal_jog_wheel.GLib.timeout_add", return_value=23) as mock_timeout,
+            patch("terminal.jog_wheel_scrollbar_mixin.GLib.source_remove") as mock_remove,
+            patch("terminal.jog_wheel_scrollbar_mixin.GLib.timeout_add", return_value=23) as mock_timeout,
         ):
             view._show_virtual_scrollbar_temporarily()
 
@@ -290,7 +290,7 @@ class TestVirtualScrollbarOverlay:
         adj.get_value.return_value = 50.0
         view._vscroll_adj = adj
 
-        with patch("terminal.terminal_jog_wheel.GLib.source_remove") as mock_remove:
+        with patch("terminal.jog_wheel_scrollbar_mixin.GLib.source_remove") as mock_remove:
             view._vscroll_reset()
 
         mock_remove.assert_called_once_with(31)

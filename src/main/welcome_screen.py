@@ -8,8 +8,8 @@ from pathlib import Path
 from gi.repository import GLib, Gtk
 
 from fonts import get_font_settings, subscribe_font_change
-from icons import Icons
-from shared.settings.keybindings import KeyBindings
+from icons import IconsManager
+from shared.settings.key_bindings import KeyBindings
 from themes import get_theme, subscribe_theme_change
 
 
@@ -147,7 +147,7 @@ class WelcomeScreen(Gtk.ScrolledWindow):
         love_label = Gtk.Label()
         love_label.set_markup(
             f'<span font_family="{font_family}" size="{font_size * 1024}" foreground="{theme.fg_color}">'
-            f'                    Made with <span font_family="ZenIcons">{Icons.HEART}</span> in 🇬🇧</span>'
+            f'                    Made with <span font_family="ZenIcons">{IconsManager.HEART}</span> in 🇬🇧</span>'
         )
         love_label.set_halign(Gtk.Align.START)
         love_label.set_xalign(0)

@@ -5,10 +5,10 @@ helpers live here. Import icons from this module instead of hardcoding
 Unicode characters throughout the codebase.
 """
 
-from icons.icon_manager import (
+from icons.icons_manager import (
     ICON_FONT_FAMILY,
     ICON_SIZE_CSS_CLASS,
-    Icons,
+    IconsManager,
     apply_icon_font,
     create_icon_label,
     get_file_icon,
@@ -20,7 +20,7 @@ from icons.icon_manager import (
 __all__ = [
     "ICON_FONT_FAMILY",
     "ICON_SIZE_CSS_CLASS",
-    "Icons",
+    "IconsManager",
     "apply_icon_font",
     "create_icon_label",
     "get_file_icon",

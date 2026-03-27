@@ -1,6 +1,6 @@
 """Laserwave theme - based on LaserWave by Eric Eldredge and Jared Jones."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 LASERWAVE = Theme(
     name="laserwave",

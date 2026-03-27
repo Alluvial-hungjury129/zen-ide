@@ -1,6 +1,6 @@
 """Gruvbox Light theme."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 GRUVBOX_LIGHT = Theme(
     name="gruvbox_light",

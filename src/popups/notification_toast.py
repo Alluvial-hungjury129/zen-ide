@@ -35,14 +35,14 @@ class NotificationToast(Gtk.Window):
             GLib.timeout_add(timeout_ms, self._on_timeout)
 
     def _create_ui(self):
-        from icons import Icons, apply_icon_font
+        from icons import IconsManager, apply_icon_font
 
         # Icon based on level
         icons = {
-            "info": Icons.INFO,
-            "success": Icons.SUCCESS,
-            "warning": Icons.WARNING,
-            "error": Icons.ERROR,
+            "info": IconsManager.INFO,
+            "success": IconsManager.SUCCESS,
+            "warning": IconsManager.WARNING,
+            "error": IconsManager.ERROR,
         }
 
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
@@ -52,7 +52,7 @@ class NotificationToast(Gtk.Window):
         box.set_margin_bottom(8)
 
         # Icon
-        icon = Gtk.Label(label=icons.get(self._level, Icons.INFO))
+        icon = Gtk.Label(label=icons.get(self._level, IconsManager.INFO))
         icon.add_css_class(f"toast-icon-{self._level}")
         apply_icon_font(icon)
         box.append(icon)

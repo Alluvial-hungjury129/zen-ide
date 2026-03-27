@@ -1,6 +1,6 @@
 """Nyoom theme - based on nyoom.nvim / oxocarbon colorscheme by nyoom-engineering."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 # Palette from oxocarbon.nvim (dark variant) with precise blend_hex values:
 # base00 = #161616  base01 = #2a2a2a  base02 = #404040  base03 = #5c5c5c

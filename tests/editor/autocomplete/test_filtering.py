@@ -68,7 +68,7 @@ class TestUpdateFilter:
             CompletionItem("open", CompletionKind.BUILTIN),
         ]
 
-        with patch("editor.autocomplete.completion_popup.get_theme"):
+        with patch("editor.autocomplete.completion_popup_mixin.get_theme"):
             ac._update_filter("pr")
 
         names = [c.name for c in ac._filtered]
@@ -83,7 +83,7 @@ class TestUpdateFilter:
             CompletionItem("bar", CompletionKind.VARIABLE),
         ]
 
-        with patch("editor.autocomplete.completion_popup.get_theme"):
+        with patch("editor.autocomplete.completion_popup_mixin.get_theme"):
             ac._update_filter("")
 
         assert len(ac._filtered) == 2
@@ -92,7 +92,7 @@ class TestUpdateFilter:
         ac = _make_autocomplete()
         ac._completions = [CompletionItem("MyClass", CompletionKind.VARIABLE)]
 
-        with patch("editor.autocomplete.completion_popup.get_theme"):
+        with patch("editor.autocomplete.completion_popup_mixin.get_theme"):
             ac._update_filter("myc")
 
         assert len(ac._filtered) == 1
@@ -104,7 +104,7 @@ class TestUpdateFilter:
         ac = _make_autocomplete()
         ac._completions = [CompletionItem(f"item_{i}", CompletionKind.VARIABLE) for i in range(50)]
 
-        with patch("editor.autocomplete.completion_popup.get_theme"):
+        with patch("editor.autocomplete.completion_popup_mixin.get_theme"):
             ac._update_filter("item")
 
         assert len(ac._filtered) == AUTOCOMPLETE_MAX_ITEMS
@@ -248,7 +248,7 @@ class TestJsDocExtraction:
     """Test JSDoc comment extraction for JS/TS completions."""
 
     def setup_method(self):
-        from editor.autocomplete.js_provider import JsCompletionProvider
+        from editor.autocomplete.js_completion_provider import JsCompletionProvider
 
         self.provider = JsCompletionProvider()
 

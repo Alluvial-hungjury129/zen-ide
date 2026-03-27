@@ -1,6 +1,6 @@
 """EGA Dreams theme — a nostalgic tribute to the Enhanced Graphics Adapter's 16-color palette."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 EGA_DREAMS = Theme(
     name="ega_dreams",

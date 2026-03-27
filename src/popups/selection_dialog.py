@@ -280,7 +280,7 @@ def show_selection(
 ):
     """Show a selection dialog and return it."""
     from popups.nvim_popup import show_popup
-    from popups.system_dialogs import SystemSelectionDialog
+    from popups.system_command_palette_dialog import SystemSelectionDialog
 
     return show_popup(
         SelectionDialog,

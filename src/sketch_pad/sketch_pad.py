@@ -9,9 +9,9 @@ from gi.repository import Gdk, Gio, GLib, Gtk
 
 from constants import SKETCH_TOOL_BTN_SIZE, SKETCH_TOOL_ICON_SIZE
 from fonts.font_manager import get_font_settings
-from icons import Icons, get_icon_font_name
+from icons import IconsManager, get_icon_font_name
 from sketch_pad.canvas import SketchCanvas
-from sketch_pad.global_settings_popup import GlobalDiagramSettingsPopup
+from sketch_pad.global_diagram_settings_popup import GlobalDiagramSettingsPopup
 from sketch_pad.sketch_model import ArrowLineStyle, ArrowShape, Board, ToolMode
 from themes import ThemeAwareMixin
 
@@ -61,16 +61,16 @@ class SketchPad(ThemeAwareMixin, Gtk.Box):
         # Tool buttons grouped: non-shape tools left, shape tools middle
         self._tool_buttons: dict[str, Gtk.ToggleButton] = {}
         non_shape_tools = [
-            ("select", "Select (V)", Icons.TOOL_SELECT),
-            ("pan", "Pan (H)", Icons.TOOL_PAN),
+            ("select", "Select (V)", IconsManager.TOOL_SELECT),
+            ("pan", "Pan (H)", IconsManager.TOOL_PAN),
         ]
         shape_tools = [
-            ("rectangle", "Rectangle (B)", Icons.TOOL_RECTANGLE),
-            ("arrow", "Arrow (A)", Icons.TOOL_ARROW),
-            ("topic", "Topic (T)", Icons.TOOL_TOPIC),
-            ("database", "Database (D)", Icons.TOOL_DATABASE),
-            ("cloud", "Cloud (C)", Icons.TOOL_CLOUD),
-            ("actor", "Actor (P)", Icons.TOOL_ACTOR),
+            ("rectangle", "Rectangle (B)", IconsManager.TOOL_RECTANGLE),
+            ("arrow", "Arrow (A)", IconsManager.TOOL_ARROW),
+            ("topic", "Topic (T)", IconsManager.TOOL_TOPIC),
+            ("database", "Database (D)", IconsManager.TOOL_DATABASE),
+            ("cloud", "Cloud (C)", IconsManager.TOOL_CLOUD),
+            ("actor", "Actor (P)", IconsManager.TOOL_ACTOR),
         ]
         for tool_id, tooltip, icon in non_shape_tools:
             btn = self._make_btn(icon, tooltip, toggle=True)
@@ -80,9 +80,9 @@ class SketchPad(ThemeAwareMixin, Gtk.Box):
 
         # Zoom
         for icon, tip, delta in [
-            (Icons.ZOOM_OUT, "Zoom Out", -0.1),
-            (Icons.ZOOM_RESET, "Reset View (0,0 / 100%)", 0),
-            (Icons.ZOOM_IN, "Zoom In", 0.1),
+            (IconsManager.ZOOM_OUT, "Zoom Out", -0.1),
+            (IconsManager.ZOOM_RESET, "Reset View (0,0 / 100%)", 0),
+            (IconsManager.ZOOM_IN, "Zoom In", 0.1),
         ]:
             btn = self._make_btn(icon, tip)
             if delta == 0:
@@ -92,7 +92,7 @@ class SketchPad(ThemeAwareMixin, Gtk.Box):
             toolbar.append(btn)
 
         # Delete
-        del_btn = self._make_btn(Icons.DELETE, "Delete Selected (Del)")
+        del_btn = self._make_btn(IconsManager.DELETE, "Delete Selected (Del)")
         del_btn.connect("clicked", lambda b: self._delete_selected())
         toolbar.append(del_btn)
 
@@ -109,7 +109,7 @@ class SketchPad(ThemeAwareMixin, Gtk.Box):
         toolbar.append(Gtk.Separator())
 
         # Global settings
-        global_btn = self._make_btn(Icons.TOOL_SETTINGS, "Global diagram settings (fonts, sizes)")
+        global_btn = self._make_btn(IconsManager.TOOL_SETTINGS, "Global diagram settings (fonts, sizes)")
         global_btn.connect("clicked", self._on_global_settings)
         toolbar.append(global_btn)
 
@@ -119,19 +119,19 @@ class SketchPad(ThemeAwareMixin, Gtk.Box):
         toolbar.append(spacer)
 
         # Export
-        export_btn = self._make_btn(Icons.EXPORT, "Export as .zen_sketch, PNG or JPEG")
+        export_btn = self._make_btn(IconsManager.EXPORT, "Export as .zen_sketch, PNG or JPEG")
         export_btn.connect("clicked", self._on_export)
         toolbar.append(export_btn)
 
         # Import
-        import_btn = self._make_btn(Icons.IMPORT, "Import .zen_sketch file")
+        import_btn = self._make_btn(IconsManager.IMPORT, "Import .zen_sketch file")
         import_btn.connect("clicked", self._on_import)
         toolbar.append(import_btn)
 
         toolbar.append(Gtk.Separator())
 
         # Clear
-        clear_btn = self._make_btn(Icons.ERASER, "Clear All")
+        clear_btn = self._make_btn(IconsManager.ERASER, "Clear All")
         clear_btn.connect("clicked", self._on_clear)
         toolbar.append(clear_btn)
 
@@ -159,7 +159,7 @@ class SketchPad(ThemeAwareMixin, Gtk.Box):
         status_bar.append(self._status_label)
         self.append(status_bar)
 
-        # Expose drawing area for focus tracking (expected by zen_ide.py)
+        # Expose drawing area for focus tracking (expected by zen_ide_window.py)
         self._drawing_area = self._canvas_widget
 
     # ───────────────────────── Toolbar callbacks ─────────────────────────
@@ -211,9 +211,9 @@ class SketchPad(ThemeAwareMixin, Gtk.Box):
         self._syncing_tool = False
 
     _LINE_STYLE_ICONS = {
-        ArrowLineStyle.SOLID: Icons.TOOL_ARROW,
-        ArrowLineStyle.DASHED: Icons.TOOL_ARROW,
-        ArrowLineStyle.DOTTED: Icons.TOOL_ARROW_DOTTED,
+        ArrowLineStyle.SOLID: IconsManager.TOOL_ARROW,
+        ArrowLineStyle.DASHED: IconsManager.TOOL_ARROW,
+        ArrowLineStyle.DOTTED: IconsManager.TOOL_ARROW_DOTTED,
     }
     _LINE_STYLE_TOOLTIPS = {
         ArrowLineStyle.SOLID: "Arrow – Solid ── (click to cycle)",

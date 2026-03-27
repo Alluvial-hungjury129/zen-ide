@@ -317,7 +317,7 @@ class TestPopupSourceCodeContracts:
 
     def test_system_context_menu_uses_modulo(self):
         """SystemContextMenu._move_selection must also use modulo wrapping."""
-        source = _read_source("system_dialogs.py")
+        source = _read_source("system_context_menu.py")
         tree = ast.parse(source)
 
         for node in ast.walk(tree):
@@ -332,7 +332,7 @@ class TestPopupSourceCodeContracts:
 
     def test_system_command_palette_uses_modulo(self):
         """SystemCommandPaletteDialog._move_selection must use modulo wrapping."""
-        source = _read_source("system_dialogs.py")
+        source = _read_source("system_command_palette_dialog.py")
         tree = ast.parse(source)
 
         for node in ast.walk(tree):

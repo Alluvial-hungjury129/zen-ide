@@ -20,8 +20,8 @@ _IS_MACOS = sys.platform == "darwin"
 
 from constants import STATUS_BAR_FONT_FAMILY, STATUS_BAR_HORIZONTAL_PADDING, STATUS_BAR_ITEM_SPACING
 from fonts import get_font_settings, subscribe_font_change
-from icons import Icons, get_icon_font_name
-from main.status_indicators import StatusIndicatorsMixin
+from icons import IconsManager, get_icon_font_name
+from main.status_indicators_mixin import StatusIndicatorsMixin
 from shared.settings import get_setting
 from themes import (
     get_theme,
@@ -155,7 +155,7 @@ class StatusBar(StatusIndicatorsMixin, Gtk.Box):
         self._git_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self._git_box.add_css_class("status-git")
 
-        self._git_icon = Gtk.Label(label=Icons.GIT_BRANCH)
+        self._git_icon = Gtk.Label(label=IconsManager.GIT_BRANCH)
         self._git_icon.add_css_class("status-git-icon")
         self._git_box.append(self._git_icon)
 

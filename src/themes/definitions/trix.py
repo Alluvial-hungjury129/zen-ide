@@ -1,6 +1,6 @@
 """Trix theme."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 TRIX = Theme(
     name="trix",

@@ -12,7 +12,7 @@ from gi.repository import GLib
 
 from shared.settings import get_setting
 
-from .context_gatherer import gather_context
+from .completion_context import gather_context
 from .ghost_text_renderer import GhostTextRenderer
 from .inline_completion_provider import InlineCompletionProvider
 

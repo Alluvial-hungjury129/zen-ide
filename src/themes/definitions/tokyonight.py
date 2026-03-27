@@ -1,6 +1,6 @@
 """Tokyo Night theme."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 TOKYONIGHT = Theme(
     name="tokyonight",

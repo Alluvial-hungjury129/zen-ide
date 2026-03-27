@@ -1,6 +1,6 @@
 """Modus Vivendi theme."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 MODUS_VIVENDI = Theme(
     name="modus_vivendi",

@@ -1,6 +1,6 @@
 """Catppuccin Latte (light) theme."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 CATPPUCCIN_LATTE = Theme(
     name="catppuccin_latte",

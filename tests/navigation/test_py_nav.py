@@ -8,7 +8,7 @@ Covers:
 - Variable/class detection (qualified, underscored, nested)
 """
 
-from navigation.code_navigation_py import PythonNavigationMixin
+from navigation.python_navigation_mixin import PythonNavigationMixin
 
 
 class _Stub(PythonNavigationMixin):

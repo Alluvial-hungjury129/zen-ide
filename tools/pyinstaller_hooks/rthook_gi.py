@@ -173,11 +173,11 @@ def _show_cocoa_splash():
         except (AttributeError, TypeError):
             ns_app.activateIgnoringOtherApps_(True)
 
-        # Store reference for cleanup by zen_ide.py
+        # Store reference for cleanup by zen_ide_window.py
         import builtins
 
         builtins._zen_splash_window = window
-        # Signal that AppKit is already loaded (skip background preload in zen_ide.py)
+        # Signal that AppKit is already loaded (skip background preload in zen_ide_window.py)
         os.environ["_ZEN_APPKIT_PRELOADED"] = "1"
     except ImportError:
         pass

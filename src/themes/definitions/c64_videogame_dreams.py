@@ -1,6 +1,6 @@
 """64 Dreams — C64 videogame inspired palette. Dark CRT glow with vivid sprite colors."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 C64_VIDEOGAME_DREAMS = Theme(
     name="c64_videogame_dreams",

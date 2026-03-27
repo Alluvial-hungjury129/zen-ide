@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from treeview import TreeItem
-from treeview.tree_panel_drag import (
+from treeview.tree_panel_drag_mixin import (
     TreePanelDragMixin,
     parse_uri_list,
     unique_dest_path,

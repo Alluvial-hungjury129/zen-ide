@@ -1,6 +1,6 @@
 """Zen Dark theme (default)."""
 
-from themes.theme_model import Theme
+from themes.theme import Theme
 
 ZEN_DARK = Theme(
     name="zen_dark",

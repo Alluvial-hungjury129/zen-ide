@@ -227,7 +227,7 @@ class TestApplySemanticTagsEdgeCases:
 import pytest
 
 try:
-    from editor.tree_sitter_buffer import TreeSitterBufferCache
+    from editor.tree_sitter_buffer_cache import TreeSitterBufferCache
 
     _HAS_TS = True
 except Exception:

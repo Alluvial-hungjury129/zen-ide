@@ -4,10 +4,10 @@ import re
 
 from gi.repository import GLib, Gtk
 
-from ai.ai_session_persistence import AISessionPersistenceMixin
-from ai.ai_tab_bar import AITabBarMixin
+from ai.ai_session_persistence_mixin import AISessionPersistenceMixin
+from ai.ai_tab_bar_mixin import AITabBarMixin
 from shared.focus_border_mixin import FocusBorderMixin
-from shared.focus_manager import get_component_focus_manager
+from shared.focus_manager import get_focus_manager
 from shared.gtk_event_utils import is_click_inside_widget
 from shared.settings import get_setting
 
@@ -48,7 +48,7 @@ class AITerminalStack(AITabBarMixin, AISessionPersistenceMixin, FocusBorderMixin
         if self._vertical_mode:
             self.remove_css_class(self.UNFOCUS_CSS_CLASS)
 
-        focus_mgr = get_component_focus_manager()
+        focus_mgr = get_focus_manager()
         focus_mgr.register(
             self.COMPONENT_ID,
             on_focus_in=self._on_focus_in,
@@ -292,7 +292,7 @@ class AITerminalStack(AITabBarMixin, AISessionPersistenceMixin, FocusBorderMixin
 
     def _on_panel_click(self, gesture, n_press, x, y):
         gesture.set_state(Gtk.EventSequenceState.DENIED)
-        get_component_focus_manager().set_focus(self.COMPONENT_ID)
+        get_focus_manager().set_focus(self.COMPONENT_ID)
 
         # In vertical mode, detect which chat pane was clicked
         if self._vertical_mode:

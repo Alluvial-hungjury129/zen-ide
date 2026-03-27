@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import re
 
-from editor.preview.code_block import CodeBlockMixin
+from editor.preview.code_block_mixin import CodeBlockMixin
 from editor.preview.content_block import ContentBlock, InlineSpan
-from editor.preview.table_block import TableBlockMixin
+from editor.preview.table_block_mixin import TableBlockMixin
 
 
 class MarkdownBlockRenderer(TableBlockMixin, CodeBlockMixin):

@@ -14,7 +14,7 @@ from typing import Callable, Optional
 
 from gi.repository import GLib, Gtk
 
-from dev_pad.activity_renderer import ActivityRendererMixin
+from dev_pad.activity_renderer_mixin import ActivityRendererMixin
 
 # Re-export all public helpers so that existing imports from dev_pad.dev_pad
 # continue to work unchanged.
@@ -33,7 +33,7 @@ from dev_pad.activity_store import (  # noqa: F401
     remove_new_file_activity,
 )
 from dev_pad.dev_pad_storage import NOTES_DIR, DevPadActivity, get_dev_pad_storage
-from icons import Icons
+from icons import IconsManager
 from shared.main_thread import main_thread_call
 from themes import ThemeAwareMixin
 
@@ -167,7 +167,7 @@ class DevPad(ActivityRendererMixin, ThemeAwareMixin, Gtk.Box):
             return
 
         # Update button to show loading
-        self.refresh_prs_btn.set_label(f"{Icons.COG} Loading...")
+        self.refresh_prs_btn.set_label(f"{IconsManager.COG} Loading...")
 
         def fetch_prs_from_folder(folder):
             """Fetch PRs from a single folder."""
@@ -217,7 +217,7 @@ class DevPad(ActivityRendererMixin, ThemeAwareMixin, Gtk.Box):
 
     def _finish_refresh_prs(self, prs_found: list):
         """Called when PR fetch completes."""
-        self.refresh_prs_btn.set_label(f"{Icons.GIT_MERGE} Refresh PRs")
+        self.refresh_prs_btn.set_label(f"{IconsManager.GIT_MERGE} Refresh PRs")
 
         if not prs_found:
             return

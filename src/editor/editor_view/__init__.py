@@ -18,7 +18,7 @@ from .core import (
 from .editor_tab import EditorTab
 from .editor_view import EditorView
 from .highlighting import _SCHEME_DIR, _cursor_scheme_fg, _generate_style_scheme
-from .source_view import ZenSourceView
+from .zen_source_view import ZenSourceView
 
 __all__ = [
     "EditorView",

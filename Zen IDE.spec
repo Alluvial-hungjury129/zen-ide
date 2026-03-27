@@ -33,7 +33,7 @@ extra_typelibs = [
 ]
 
 a = Analysis(
-    ['src/zen_ide.py'],
+    ['src/zen_ide_window.py'],
     pathex=['src'],
     binaries=extra_binaries,
     datas=[

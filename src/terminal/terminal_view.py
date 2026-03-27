@@ -7,18 +7,18 @@ import os
 
 from gi.repository import Gdk, Gtk, Pango, Vte
 
-from shared.focus_manager import get_component_focus_manager
+from shared.focus_manager import get_focus_manager
 from shared.settings import get_setting
 from shared.utils import sanitize_font_for_vte as _sanitize_font_for_vte
-from terminal.terminal_file_navigation import (
+from terminal.terminal_file_navigation_mixin import (
     TerminalFileNavigationMixin,
 )
 from terminal.terminal_scroll import (
     configure_vte_scrolling,
     map_terminal_scroll_delta,
 )
-from terminal.terminal_shell import TerminalShellMixin
-from terminal.terminal_shortcuts import TerminalShortcutsMixin
+from terminal.terminal_shell_mixin import TerminalShellMixin
+from terminal.terminal_shortcuts_mixin import TerminalShortcutsMixin
 from themes import get_theme, subscribe_theme_change
 
 
@@ -293,7 +293,7 @@ class TerminalView(
         """Handle click on panel to gain focus."""
         # Deny the gesture so child buttons (e.g. +, ×) still receive clicks
         gesture.set_state(Gtk.EventSequenceState.DENIED)
-        get_component_focus_manager().set_focus(self.COMPONENT_ID)
+        get_focus_manager().set_focus(self.COMPONENT_ID)
 
     def _setup_scroll_controller(self):
         """Install terminal scroll remapping to keep pixel-style wheel behavior."""
