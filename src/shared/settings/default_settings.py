@@ -25,7 +25,7 @@ DEFAULT_SETTINGS = {
         "indent_guide_alpha": 0.6,  # Override indent guide opacity (0.0-1.0); -1 = use default
         "show_minimap": True,
         "scroll_past_end": True,
-        "show_whitespace": True,
+        "show_whitespace": False,
         "whitespace_color": "",  # Override whitespace dot/arrow color (hex); empty = use theme fg_dim
         "whitespace_alpha": 0.5,  # Whitespace dot/arrow opacity (0.0-1.0); -1 = fully opaque
         "auto_close_brackets": True,
