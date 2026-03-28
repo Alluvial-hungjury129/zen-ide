@@ -54,7 +54,7 @@ def _generate_style_scheme(theme) -> str:
   <style name="selection" foreground="{sel_fg}" background="sel"/>
   <style name="cursor" foreground="{_cursor_scheme_fg(editor_bg)}"/>
   <style name="current-line" background="{theme.hover_bg}"/>
-  <style name="line-numbers" foreground="line_fg" background="line_bg"/>
+  <style name="line-numbers" foreground="line_fg" background="bg"/>
   <style name="right-margin" foreground="dim"/>
   <style name="bracket-match" foreground="fg" background="sel" bold="true"/>
   <style name="bracket-mismatch" foreground="{theme.get_syntax_color("syntax_string")}" background="bg" underline="true"/>

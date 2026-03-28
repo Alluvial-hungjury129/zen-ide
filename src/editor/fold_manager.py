@@ -12,7 +12,11 @@ from gi.repository import GLib, Gtk
 from shared.settings import get_setting
 from themes import subscribe_settings_change
 
-from .line_number_fold_renderer import LineNumberFoldRenderer
+from .line_number_fold_renderer import (
+    BreakpointGutterRenderer,
+    FoldChevronRenderer,
+    LineNumberRenderer,
+)
 
 # ---------------------------------------------------------------------------
 # Foldable node types per tree-sitter language
@@ -122,21 +126,29 @@ class FoldManager:
         # Schedule initial fold region computation (buffer is already loaded)
         GLib.timeout_add(200, self._recompute_regions)
 
-        # Insert unified line-number + fold renderer into left gutter
-        self._gutter_renderer = LineNumberFoldRenderer(self, view)
+        # Insert 3 gutter renderers: breakpoints | line numbers | fold chevrons
         gutter = view.get_gutter(Gtk.TextWindowType.LEFT)
-        gutter.insert(self._gutter_renderer, 0)
+        self._bp_renderer = BreakpointGutterRenderer(view)
+        self._gutter_renderer = LineNumberRenderer(view, self)
+        self._chevron_renderer = FoldChevronRenderer(view, self)
+        gutter.insert(self._bp_renderer, 0)
+        gutter.insert(self._gutter_renderer, 1)
+        gutter.insert(self._chevron_renderer, 2)
 
         # Respect editor.show_line_numbers setting (initial + live changes)
         editor_settings = get_setting("editor", {})
         if not editor_settings.get("show_line_numbers", True):
-            self._gutter_renderer.set_visible(False)
+            self._set_gutter_visible(False)
         subscribe_settings_change(self._on_settings_change)
 
+    def _set_gutter_visible(self, show: bool):
+        for r in (self._bp_renderer, self._gutter_renderer, self._chevron_renderer):
+            if r:
+                r.set_visible(show)
+
     def set_show_line_numbers(self, show: bool):
-        """Toggle visibility of the custom line-number + fold gutter."""
-        if self._gutter_renderer:
-            self._gutter_renderer.set_visible(show)
+        """Toggle visibility of the gutter renderers."""
+        self._set_gutter_visible(show)
 
     def _on_settings_change(self, key, value):
         if key == "editor" and isinstance(value, dict):

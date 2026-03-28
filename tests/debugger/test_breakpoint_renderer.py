@@ -58,16 +58,17 @@ class TestHasContent:
         renderer.set_current_line(10)
         assert renderer.has_content is True
 
-    def test_has_content_with_breakpoints(self):
+    def test_no_content_with_only_breakpoints(self):
+        # Breakpoint dots are now drawn by LineNumberFoldRenderer,
+        # so BreakpointRenderer only has content for execution pointer.
         renderer, view, mgr = _make_renderer()
         renderer.set_file_path("/test.py")
         mgr.has_breakpoints.return_value = True
-        assert renderer.has_content is True
+        assert renderer.has_content is False
 
     def test_no_content_without_file_path(self):
         renderer, view, mgr = _make_renderer()
         mgr.has_breakpoints.return_value = True
-        # No file path set, so has_breakpoints won't be checked
         assert renderer.has_content is False
 
 

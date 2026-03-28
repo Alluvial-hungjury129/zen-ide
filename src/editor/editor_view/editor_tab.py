@@ -47,8 +47,11 @@ class EditorTab(EditorTabInputMixin, EditorTabHoverMixin, EditorTabThemeMixin, E
         from debugger.breakpoint_manager import get_breakpoint_manager
         from debugger.breakpoint_renderer import BreakpointRenderer
 
-        self._breakpoint_renderer = BreakpointRenderer(self.view, get_breakpoint_manager())
+        bp_mgr = get_breakpoint_manager()
+        self._breakpoint_renderer = BreakpointRenderer(self.view, bp_mgr)
         self.view._breakpoint_renderer = self._breakpoint_renderer
+
+        # Breakpoint manager wired to gutter renderer after fold manager init (below)
 
         # Diagnostic wavy underline tags
         self._setup_diagnostic_underline_tags()
@@ -76,6 +79,10 @@ class EditorTab(EditorTabInputMixin, EditorTabHoverMixin, EditorTabThemeMixin, E
 
         self._fold_manager = FoldManager(self.view, self._ts_cache)
         self.view._fold_manager = self._fold_manager
+
+        # Wire breakpoint manager into the breakpoint gutter renderer
+        if self._fold_manager._bp_renderer:
+            self._fold_manager._bp_renderer.set_breakpoint_source(bp_mgr)
 
         # Autocomplete (Ctrl+Space) — lazy init on first use
         self._autocomplete = None
@@ -185,6 +192,11 @@ class EditorTab(EditorTabInputMixin, EditorTabHoverMixin, EditorTabThemeMixin, E
 
             # Update breakpoint renderer with file path
             self._breakpoint_renderer.set_file_path(file_path)
+
+            # Update breakpoint gutter renderer with file path
+            fm = getattr(self.view, "_fold_manager", None)
+            if fm and fm._bp_renderer:
+                fm._bp_renderer.set_file_path(file_path)
 
             # Apply cached diagnostics (from workspace scan) or run fresh
             self._apply_or_run_diagnostics()

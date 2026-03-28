@@ -72,8 +72,10 @@ class WindowLayoutMixin(LayoutCssMixin, LayoutDndMixin):
             }}
             paned > separator {{
                 background-color: {theme.sash_color};
-                min-width: 4px;
-                min-height: 4px;
+                min-width: 1px;
+                min-height: 1px;
+                max-width: 1px;
+                max-height: 1px;
             }}
             paned > separator:backdrop {{
                 background-color: {theme.sash_color};

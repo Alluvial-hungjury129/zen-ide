@@ -162,9 +162,8 @@ class GutterDiffRenderer:
         color_change = hex_to_gdk_rgba(theme.git_modified, 0.9)
         color_del = hex_to_gdk_rgba(theme.git_deleted, 0.9)
 
-        # Position indicators just to the left of the text area
-        text_x, _ = view.buffer_to_window_coords(Gtk.TextWindowType.WIDGET, 0, 0)
-        indicator_x = max(text_x - width - 2, 0)
+        # Position indicators at the left border of the gutter
+        indicator_x = 0
 
         # Use pre-computed visible range if available
         if vis_range is not None:
