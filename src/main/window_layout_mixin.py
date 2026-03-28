@@ -160,11 +160,11 @@ class WindowLayoutMixin(LayoutCssMixin, LayoutDndMixin):
         """Create the main IDE layout.
 
         Layout:
-        +------------------+--------------------------------+
-        |                  |            Editor              |
-        |     TreeView     +--------------------------------+
-        |                  |   AI Chat    |    Terminal     |
-        +------------------+--------------------------------+
+        +------------------+------------------+-------------+
+        |                  |                  |  AI Chat    |
+        |     TreeView     |     Editor       +-------------+
+        |                  |                  |  Terminal   |
+        +------------------+------------------+-------------+
 
         A lightweight stub titlebar is used here instead of a full HeaderBar
         to avoid the ~13ms HeaderBar realization cost during present->map.
@@ -199,7 +199,7 @@ class WindowLayoutMixin(LayoutCssMixin, LayoutDndMixin):
         win_h = layout.get("window_height", 800)
         if saved_main < 50 or saved_main > win_w - 100:
             saved_main = DEFAULT_TREE_WIDTH
-        if saved_right < 150 or saved_right > win_h - 100:
+        if saved_right < 150 or saved_right > win_w - 100:
             saved_right = DEFAULT_EDITOR_SPLIT
 
         # Store for re-application after child swaps
@@ -220,13 +220,13 @@ class WindowLayoutMixin(LayoutCssMixin, LayoutDndMixin):
         self.tree_view.set_size_request(DEFAULT_TREE_MIN_WIDTH, -1)
         self.main_paned.set_start_child(self.tree_view)
 
-        # Right: Vertical paned [Editor | Bottom Panel]
-        self.right_paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
+        # Right: Horizontal paned [Editor | Side Panel (AI Chat + Terminal)]
+        self.right_paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         self.right_paned.set_shrink_start_child(True)
         self.right_paned.set_shrink_end_child(True)
         self.main_paned.set_end_child(self.right_paned)
 
-        # Top right: Editor placeholder placed directly under right_paned for now.
+        # Left of right_paned: Editor placeholder placed directly under right_paned for now.
         # The editor_split_paned wrapper (for diff/split view) is created lazily
         # in _on_window_mapped to reduce the pre-paint widget count (~2ms savings).
         self.editor_view = Gtk.Box()
@@ -243,11 +243,11 @@ class WindowLayoutMixin(LayoutCssMixin, LayoutDndMixin):
         # in _deferred_init_editor to keep pre-map startup work minimal.
         self.split_panels = None
 
-        # Bottom: single placeholder box — the real Paned with AI Chat + Terminal
+        # Right side: single placeholder box — the real Paned with AI Chat + Terminal
         # is created in _create_bottom_panels after first paint to reduce the
         # pre-map widget count (saves 2 widget realizations).
         self.bottom_paned = Gtk.Box()
-        self.bottom_paned.set_size_request(-1, DEFAULT_BOTTOM_PANEL_MIN_HEIGHT)
+        self.bottom_paned.set_size_request(DEFAULT_BOTTOM_PANEL_MIN_HEIGHT, -1)
         self.right_paned.set_end_child(self.bottom_paned)
 
         # Placeholders for AI chat and terminal (set here so attribute access

@@ -10,8 +10,8 @@ DEFAULT_WINDOW_HEIGHT = 900
 # Layout Defaults
 DEFAULT_TREE_WIDTH = 400  # pixels width of tree view sidebar
 DEFAULT_TREE_MIN_WIDTH = 0  # minimum width tree view can be resized to
-DEFAULT_EDITOR_SPLIT = 500  # initial vertical split position (editor vs bottom panel)
-DEFAULT_BOTTOM_PANEL_MIN_HEIGHT = 200  # minimum height for AI chat and terminal
+DEFAULT_EDITOR_SPLIT = 500  # initial horizontal split position (editor vs side panel)
+DEFAULT_BOTTOM_PANEL_MIN_HEIGHT = 200  # minimum size for AI chat and terminal panels
 
 # Font
 DEFAULT_FONT_SIZE = 16

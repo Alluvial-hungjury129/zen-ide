@@ -55,8 +55,8 @@ class StartupOptimizerMixin:
 
         self._ai_enabled = get_setting("ai.is_enabled", True)
 
-        # Replace placeholder Box with real Paned for bottom panels
-        real_bottom = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        # Replace placeholder Box with real Paned for side panels (AI Chat on top, Terminal on bottom)
+        real_bottom = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
         real_bottom.set_shrink_start_child(False)
         real_bottom.set_shrink_end_child(False)
         # Preserve visibility state from placeholder (hidden in single-file mode)

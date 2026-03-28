@@ -66,20 +66,22 @@ class WindowPanelsMixin:
             self._collapse_editor()
 
     def _ensure_editor_min_height(self):
-        """Ensure editor area gets at least 60% of window height.
+        """Ensure editor area gets at least 60% of available width.
 
-        When bottom panels (AI chat + terminal) dominate the vertical space,
+        When side panels (AI chat + terminal) dominate the horizontal space,
         adjust right_paned position so the editor/sketch area is usable.
         """
-        window_height = self.get_height()
-        if window_height <= 0:
+        window_width = self.get_width()
+        tree_width = self.main_paned.get_position()
+        available_width = window_width - tree_width
+        if available_width <= 0:
             return
-        min_editor_height = int(window_height * 0.6)
+        min_editor_width = int(available_width * 0.6)
         current_pos = self.right_paned.get_position()
-        if current_pos < min_editor_height:
+        if current_pos < min_editor_width:
             from shared.utils import animate_paned
 
-            animate_paned(self.right_paned, min_editor_height, on_done=self._sync_terminal_resize)
+            animate_paned(self.right_paned, min_editor_width, on_done=self._sync_terminal_resize)
 
     # -- End split panel callbacks --
 
@@ -137,7 +139,7 @@ class WindowPanelsMixin:
 
             if panel_name == "editor":
                 animate_paned(self.main_paned, 0)
-                animate_paned(self.right_paned, h, on_done=self._sync_terminal_resize)
+                animate_paned(self.right_paned, w, on_done=self._sync_terminal_resize)
             elif panel_name == "terminal":
                 animate_paned(self.main_paned, 0)
                 animate_paned(self.right_paned, 0)
@@ -149,11 +151,11 @@ class WindowPanelsMixin:
                 animate_paned(self.main_paned, 0)
                 self.right_paned.set_shrink_start_child(True)
                 animate_paned(self.right_paned, 0)
-                animate_paned(self.bottom_paned, w, on_done=self._sync_terminal_resize)
+                animate_paned(self.bottom_paned, h, on_done=self._sync_terminal_resize)
                 self.terminal_view.set_visible(False)
             elif panel_name == "tree":
                 animate_paned(self.main_paned, w)
-                animate_paned(self.right_paned, h, on_done=self._sync_terminal_resize)
+                animate_paned(self.right_paned, w, on_done=self._sync_terminal_resize)
 
             self._maximized_panel = panel_name
 
@@ -206,7 +208,8 @@ class WindowPanelsMixin:
         if self.main_paned.get_position() < 50:
             animate_paned(self.main_paned, DEFAULT_TREE_WIDTH)
 
-        window_height = self.get_height()
+        window_width = self.get_width()
+        available_width = window_width - DEFAULT_TREE_WIDTH
         # Collapse editor if no tabs are open (only if auto_expand_terminals is enabled)
         # but keep editor visible when welcome screen or dev pad is showing
         from shared.settings.settings_manager import get_setting
@@ -221,7 +224,7 @@ class WindowPanelsMixin:
             animate_paned(self.right_paned, 0, on_done=self._sync_terminal_resize)
             self._editor_collapsed = True
         elif self.right_paned.get_position() < 50:
-            animate_paned(self.right_paned, int(window_height * 0.65), on_done=self._sync_terminal_resize)
+            animate_paned(self.right_paned, int(available_width * 0.65), on_done=self._sync_terminal_resize)
 
     # -- Default layout --
 
@@ -243,11 +246,11 @@ class WindowPanelsMixin:
 
         # Default proportions:
         # - Tree view: DEFAULT_TREE_WIDTH fixed width
-        # - Editor takes ~65% of vertical space, bottom panel ~35%
-        # - AI chat and terminal split 50/50 horizontally in bottom panel (when AI enabled)
-        editor_height = int(window_height * 0.65)
-        bottom_panel_width = window_width - DEFAULT_TREE_WIDTH
-        ai_chat_width = bottom_panel_width // 2 if ai_enabled else 0
+        # - Editor takes ~65% of horizontal space, side panel ~35%
+        # - AI chat and terminal split 50/50 vertically in side panel (when AI enabled)
+        available_width = window_width - DEFAULT_TREE_WIDTH
+        editor_width = int(available_width * 0.65)
+        ai_chat_height = window_height // 2 if ai_enabled else 0
 
         # Apply positions with animation
         animate_paned(self.main_paned, DEFAULT_TREE_WIDTH)
@@ -264,13 +267,13 @@ class WindowPanelsMixin:
             animate_paned(self.right_paned, 0)
             self._editor_collapsed = True
         else:
-            animate_paned(self.right_paned, editor_height)
+            animate_paned(self.right_paned, editor_width)
             self._editor_collapsed = False
-        # Only reset bottom panel proportions if auto_expand_terminals is enabled
+        # Only reset side panel proportions if auto_expand_terminals is enabled
         from shared.settings.settings_manager import get_setting
 
         if get_setting("behavior.auto_expand_terminals", True):
-            animate_paned(self.bottom_paned, ai_chat_width, on_done=self._sync_terminal_resize)
+            animate_paned(self.bottom_paned, ai_chat_height, on_done=self._sync_terminal_resize)
 
         return False  # Don't repeat
 
