@@ -182,6 +182,7 @@ class ViewActionsMixin:
         # If panels were hidden in single-file mode, create and show them
         if not self._bottom_panels_created:
             self._create_bottom_panels()
+            self.editor_view.on_maximize = lambda name: self._maximize_panel(name)
             if getattr(self, "_ai_enabled", True):
                 self.ai_chat.on_maximize = lambda name: self._maximize_panel(name)
             self.terminal_view.on_maximize = lambda name: self._maximize_panel(name)

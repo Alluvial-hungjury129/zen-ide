@@ -163,6 +163,18 @@ class WindowPanelsMixin:
 
     def _sync_maximize_buttons(self):
         """Sync maximize button selected state on panels with internal _maximized_panel."""
+        # Editor maximize button (always available)
+        if hasattr(self, "editor_view"):
+            is_max = self._maximized_panel == "editor"
+            btn = getattr(self.editor_view, "maximize_btn", None)
+            if btn:
+                if is_max:
+                    btn.add_css_class("selected")
+                    btn.set_tooltip_text("Restore")
+                else:
+                    btn.remove_css_class("selected")
+                    btn.set_tooltip_text("Maximize")
+
         if not self._bottom_panels_created:
             return
         ai_enabled = getattr(self, "_ai_enabled", True)
@@ -192,6 +204,7 @@ class WindowPanelsMixin:
         # Create bottom panels if not yet created (single-file mode)
         if not self._bottom_panels_created:
             self._create_bottom_panels()
+            self.editor_view.on_maximize = lambda name: self._maximize_panel(name)
             if ai_enabled:
                 self.ai_chat.on_maximize = lambda name: self._maximize_panel(name)
             self.terminal_view.on_maximize = lambda name: self._maximize_panel(name)

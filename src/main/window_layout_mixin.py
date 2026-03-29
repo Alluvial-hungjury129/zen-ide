@@ -102,11 +102,13 @@ class WindowLayoutMixin(LayoutCssMixin, LayoutDndMixin):
             }}
             notebook > header {{
                 background-color: {theme.tab_bg};
-                border-bottom: none;
+                border: none;
+                box-shadow: none;
             }}
             notebook > header:backdrop {{
                 background-color: {theme.tab_bg};
-                border-bottom: none;
+                border: none;
+                box-shadow: none;
             }}
             notebook > header > tabs {{
                 background-color: {theme.tab_bg};
@@ -136,6 +138,20 @@ class WindowLayoutMixin(LayoutCssMixin, LayoutDndMixin):
             }}
             notebook > header > tabs > tab:hover {{
                 background-color: transparent;
+            }}
+            notebook > header > box {{
+                background-color: {theme.tab_bg};
+                padding: 0;
+                margin: 0;
+            }}
+            notebook > header button {{
+                background: transparent;
+                border: none;
+                box-shadow: none;
+                outline: none;
+            }}
+            notebook > header button:hover {{
+                background: transparent;
             }}
             @define-color accent_color {theme.accent_color};
             @define-color accent_bg_color {theme.accent_color};

@@ -5,8 +5,10 @@ from typing import Callable
 
 from gi.repository import GLib, Gtk
 
+from icons import IconsManager
 from shared.focus_border_mixin import FocusBorderMixin
 from shared.focus_manager import get_focus_manager
+from shared.ui import ZenButton
 from themes import subscribe_theme_change
 
 from . import SKETCH_EXTENSION
@@ -58,6 +60,9 @@ class EditorView(
         # Callback for when any tab is closed (for persisting open files)
         self.on_tab_closed: Callable[[], None] | None = None
 
+        # Callbacks for editor action buttons
+        self.on_maximize: Callable[[str], None] | None = None
+
         # Create notebook for tabs
         self.notebook = Gtk.Notebook()
         self.notebook.set_scrollable(True)
@@ -65,6 +70,20 @@ class EditorView(
         self.notebook.set_vexpand(True)
         self.notebook.connect("switch-page", self._on_tab_changed)
         self.append(self.notebook)
+
+        # Action buttons at the end of the tab bar
+        action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        action_box.set_margin_end(4)
+
+        self.debug_btn = ZenButton(icon=IconsManager.PLAY, tooltip="Start Debugging (F5)")
+        self.debug_btn.connect("clicked", self._on_debug_btn_clicked)
+        action_box.append(self.debug_btn)
+
+        self.maximize_btn = ZenButton(icon=IconsManager.MAXIMIZE, tooltip="Maximize")
+        self.maximize_btn.connect("clicked", self._on_maximize_clicked)
+        action_box.append(self.maximize_btn)
+
+        self.notebook.set_action_widget(action_box, Gtk.PackType.END)
 
         # Track active/previous tab for close-button restoration
         self._active_tab_id = -1
@@ -491,3 +510,16 @@ class EditorView(
         if tab:
             return (tab.buffer, tab.view)
         return None
+
+    def _on_debug_btn_clicked(self, button):
+        """Activate the debug_start action."""
+        root = self.get_root()
+        if root:
+            app = root.get_application()
+            if app:
+                app.activate_action("debug_start")
+
+    def _on_maximize_clicked(self, button):
+        """Delegate maximize to parent window."""
+        if self.on_maximize:
+            self.on_maximize("editor")

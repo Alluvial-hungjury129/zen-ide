@@ -104,8 +104,13 @@ class IconsManager:
     ERROR = "\uf057"  # nf-fa-times_circle
     ERROR_X = "\uea76"  # nf-cod-close
     MODIFIED_DOT = "\uea71"  # nf-cod-circle_filled
-    STOP = "\uf04d"  # nf-fa-stop
-    PLAY = "\ueb2c"  # nf-cod-play
+    STOP = "\uead7"  # nf-cod-debug_stop
+    PLAY = "\uead8"  # nf-cod-debug_alt
+    CONTINUE = "\ueacf"  # nf-cod-debug_continue
+    STEP_OVER = "\uead6"  # nf-cod-debug_step_over
+    STEP_INTO = "\U000f01b9"  # nf-md-debug_step_into
+    STEP_OUT = "\U000f01b8"  # nf-md-debug_step_out
+    RESTART = "\uead2"  # nf-cod-debug_restart
     UNDO_ARROW = "\uf0e2"  # nf-fa-undo
 
     # ── Git ─────────────────────────────────────────────────────────

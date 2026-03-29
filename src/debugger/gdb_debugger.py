@@ -10,7 +10,6 @@ Flow:
 4. Parse MI output records into events/responses for the IDE
 """
 
-import json
 import os
 import re
 import shutil
@@ -118,7 +117,7 @@ class GdbClient:
 
     def clear_file_breaks(self, file: str) -> None:
         # Delete all breakpoints in this file via CLI
-        self._send_mi(f"-interpreter-exec console \"clear {file}:1\"", ignore_error=True)
+        self._send_mi(f'-interpreter-exec console "clear {file}:1"', ignore_error=True)
         # More reliable: list then delete
         self._send_mi_request("-break-list", self._make_clear_callback(file))
 
@@ -235,7 +234,7 @@ class GdbClient:
         main_thread_call(
             self._on_event,
             "output",
-            {"text": f"Compiling with make (debug flags)...\n", "category": "console"},
+            {"text": "Compiling with make (debug flags)...\n", "category": "console"},
         )
 
         # Determine if C or C++
@@ -384,6 +383,7 @@ class GdbClient:
 
     def _make_clear_callback(self, file: str):
         """Create callback to clear breakpoints for a file after -break-list."""
+
         def _callback(future):
             try:
                 result = future.result(timeout=2)
@@ -396,6 +396,7 @@ class GdbClient:
                             self._send_mi(f"-break-delete {bp_num}")
             except Exception:
                 pass
+
         return _callback
 
     def _reader_loop(self) -> None:
@@ -456,18 +457,14 @@ class GdbClient:
         m = re.match(r'^~"(.*)"$', line)
         if m:
             text = _mi_unescape(m.group(1))
-            main_thread_call(
-                self._on_event, "output", {"text": text, "category": "stdout"}
-            )
+            main_thread_call(self._on_event, "output", {"text": text, "category": "stdout"})
             return
 
         # Target stream: @"text"
         m = re.match(r'^@"(.*)"$', line)
         if m:
             text = _mi_unescape(m.group(1))
-            main_thread_call(
-                self._on_event, "output", {"text": text, "category": "stdout"}
-            )
+            main_thread_call(self._on_event, "output", {"text": text, "category": "stdout"})
             return
 
         # Log stream: &"text"
@@ -501,12 +498,14 @@ class GdbClient:
             if isinstance(stack_data, list):
                 for i, frame_entry in enumerate(stack_data):
                     f = frame_entry.get("frame", frame_entry) if isinstance(frame_entry, dict) else {}
-                    frames.append({
-                        "id": int(f.get("level", i)),
-                        "name": f.get("func", "<unknown>"),
-                        "file": f.get("fullname", f.get("file", "")),
-                        "line": int(f.get("line", 0)),
-                    })
+                    frames.append(
+                        {
+                            "id": int(f.get("level", i)),
+                            "name": f.get("func", "<unknown>"),
+                            "file": f.get("fullname", f.get("file", "")),
+                            "line": int(f.get("line", 0)),
+                        }
+                    )
             return {"frames": frames}
 
         # Variables list (from -stack-list-variables)
@@ -533,12 +532,14 @@ class GdbClient:
                     if numchild > 0:
                         varobj_name = child.get("name", "")
                         ref = self._store_varobj(varobj_name)
-                    variables.append({
-                        "name": name,
-                        "value": value,
-                        "type": vtype,
-                        "ref": ref,
-                    })
+                    variables.append(
+                        {
+                            "name": name,
+                            "value": value,
+                            "type": vtype,
+                            "ref": ref,
+                        }
+                    )
             return {"variables": variables}
 
         # Expression evaluation
@@ -645,21 +646,23 @@ class GdbClient:
 
             # Create a GDB varobj for expandable types
             ref_id = 0
-            if vtype and not vtype.startswith(("int", "char", "float", "double",
-                                                "bool", "long", "short", "unsigned",
-                                                "_Bool", "size_t", "ssize_t")):
+            if vtype and not vtype.startswith(
+                ("int", "char", "float", "double", "bool", "long", "short", "unsigned", "_Bool", "size_t", "ssize_t")
+            ):
                 # Might be expandable — create varobj
                 try:
                     self._send_mi_create_varobj(name, ref_id)
                 except Exception:
                     pass
 
-            variables.append({
-                "name": name,
-                "value": value,
-                "type": vtype,
-                "ref": ref_id,
-            })
+            variables.append(
+                {
+                    "name": name,
+                    "value": value,
+                    "type": vtype,
+                    "ref": ref_id,
+                }
+            )
         return variables
 
     def _send_mi_create_varobj(self, expr: str, parent_ref: int) -> None:
@@ -734,11 +737,11 @@ def _parse_mi_dict(s: str) -> dict:
             # Quoted string
             val, i = _parse_mi_string(s, i)
             result[key] = val
-        elif s[i] == '{':
+        elif s[i] == "{":
             # Tuple/dict
             val, i = _parse_mi_tuple(s, i)
             result[key] = val
-        elif s[i] == '[':
+        elif s[i] == "[":
             # List
             val, i = _parse_mi_list(s, i)
             result[key] = val

@@ -8,6 +8,8 @@ import os
 
 from gi.repository import GLib, Gtk, Pango
 
+from icons import IconsManager
+from shared.ui import ZenButton
 from themes import get_theme
 
 from .breakpoint_manager import Breakpoint, get_breakpoint_manager
@@ -33,24 +35,17 @@ class DebugPanel(Gtk.Box):
         self._toolbar = self._create_toolbar()
         self.append(self._toolbar)
 
-        # -- Main content: left (call stack + breakpoints) | right (variables + console) --
-        content_paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        content_paned.set_vexpand(True)
-        content_paned.set_shrink_start_child(False)
-        content_paned.set_shrink_end_child(False)
-        self.append(content_paned)
-
-        # Left side: call stack + breakpoints
-        left_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        left_box.set_size_request(200, -1)
-        content_paned.set_start_child(left_box)
+        # -- Main content: all sections stacked vertically --
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content_box.set_vexpand(True)
+        self.append(content_box)
 
         # Call stack section
-        left_box.append(self._create_section_label("CALL STACK"))
+        content_box.append(self._create_section_label("CALL STACK"))
         stack_scroll = Gtk.ScrolledWindow()
         stack_scroll.set_vexpand(True)
         stack_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        left_box.append(stack_scroll)
+        content_box.append(stack_scroll)
 
         self._stack_list = Gtk.ListBox()
         self._stack_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
@@ -58,29 +53,12 @@ class DebugPanel(Gtk.Box):
         self._stack_list.add_css_class("debug-stack-list")
         stack_scroll.set_child(self._stack_list)
 
-        # Breakpoints section
-        left_box.append(self._create_section_label("BREAKPOINTS"))
-        bp_scroll = Gtk.ScrolledWindow()
-        bp_scroll.set_vexpand(True)
-        bp_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        left_box.append(bp_scroll)
-
-        self._bp_list = Gtk.ListBox()
-        self._bp_list.set_selection_mode(Gtk.SelectionMode.NONE)
-        self._bp_list.add_css_class("debug-bp-list")
-        bp_scroll.set_child(self._bp_list)
-
-        # Right side: variables + console
-        right_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        right_box.set_size_request(200, -1)
-        content_paned.set_end_child(right_box)
-
         # Variables section
-        right_box.append(self._create_section_label("VARIABLES"))
+        content_box.append(self._create_section_label("VARIABLES"))
         var_scroll = Gtk.ScrolledWindow()
         var_scroll.set_vexpand(True)
         var_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        right_box.append(var_scroll)
+        content_box.append(var_scroll)
 
         self._var_tree = Gtk.TreeView()
         self._var_tree.set_headers_visible(True)
@@ -107,14 +85,23 @@ class DebugPanel(Gtk.Box):
         self._var_tree.connect("row-expanded", self._on_variable_expanded)
         var_scroll.set_child(self._var_tree)
 
+        # Breakpoints section
+        content_box.append(self._create_section_label("BREAKPOINTS"))
+        bp_scroll = Gtk.ScrolledWindow()
+        bp_scroll.set_vexpand(True)
+        bp_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        content_box.append(bp_scroll)
+
+        self._bp_list = Gtk.ListBox()
+        self._bp_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._bp_list.add_css_class("debug-bp-list")
+        bp_scroll.set_child(self._bp_list)
+
         # Debug console section
-        right_box.append(self._create_section_label("DEBUG CONSOLE"))
+        content_box.append(self._create_section_label("DEBUG CONSOLE"))
         self._console = DebugConsole(on_evaluate=self._on_evaluate)
         self._console.set_vexpand(True)
-        right_box.append(self._console)
-
-        # Set initial paned position
-        GLib.idle_add(lambda: content_paned.set_position(250) or False)
+        content_box.append(self._console)
 
         # Subscribe to breakpoint changes
         self._breakpoint_mgr.subscribe(self._on_breakpoints_changed)
@@ -138,21 +125,18 @@ class DebugPanel(Gtk.Box):
         toolbar.add_css_class("debug-toolbar")
 
         buttons = [
-            ("Continue", "media-playback-start-symbolic", self._on_continue),
-            ("Step Over", "go-next-symbolic", self._on_step_over),
-            ("Step In", "go-down-symbolic", self._on_step_in),
-            ("Step Out", "go-up-symbolic", self._on_step_out),
-            ("Restart", "view-refresh-symbolic", self._on_restart),
-            ("Stop", "process-stop-symbolic", self._on_stop),
+            ("Continue", IconsManager.CONTINUE, self._on_continue),
+            ("Step Over", IconsManager.STEP_OVER, self._on_step_over),
+            ("Step In", IconsManager.STEP_INTO, self._on_step_in),
+            ("Step Out", IconsManager.STEP_OUT, self._on_step_out),
+            ("Restart", IconsManager.RESTART, self._on_restart),
+            ("Stop", IconsManager.STOP, self._on_stop),
         ]
 
         self._toolbar_buttons = {}
         for label, icon, callback in buttons:
-            btn = Gtk.Button()
-            btn.set_icon_name(icon)
-            btn.set_tooltip_text(label)
+            btn = ZenButton(icon=icon, tooltip=label)
             btn.connect("clicked", callback)
-            btn.add_css_class("flat")
             btn.add_css_class("debug-toolbar-btn")
             toolbar.append(btn)
             self._toolbar_buttons[label] = btn
@@ -197,7 +181,7 @@ class DebugPanel(Gtk.Box):
             SessionState.INITIALIZING: "Starting...",
             SessionState.RUNNING: "Running",
             SessionState.STOPPED: "Paused",
-            SessionState.TERMINATED: "Terminated",
+            SessionState.TERMINATED: "",
         }
         self._status_label.set_text(state_labels.get(state, ""))
 
@@ -400,7 +384,7 @@ class DebugPanel(Gtk.Box):
         """Called when the debug session state changes."""
         self._update_toolbar_state()
         if session.state == SessionState.TERMINATED:
-            self._status_label.set_text("Terminated")
+            self._status_label.set_text("")
 
     def on_session_stopped(self, session: DebugSession, thread_id: int, reason: str, file_path: str, line: int) -> None:
         """Called when execution stops (breakpoint hit, step completed)."""
@@ -418,14 +402,7 @@ class DebugPanel(Gtk.Box):
             self._window.editor_view.open_file(file_path, line)
 
         # Update status
-        reason_text = {
-            "breakpoint": "Breakpoint hit",
-            "step": "Step completed",
-            "exception": "Exception",
-            "pause": "Paused",
-        }.get(reason, reason)
-        basename = os.path.basename(file_path) if file_path else ""
-        self._status_label.set_text(f"{reason_text} — {basename}:{line}")
+        self._status_label.set_text("")
 
     # -- Helpers --
 

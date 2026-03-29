@@ -2,7 +2,6 @@
 
 import os
 import shutil
-import subprocess
 import tempfile
 
 import pytest
@@ -14,7 +13,6 @@ from debugger.gdb_debugger import (
     _parse_mi_list,
     _parse_mi_string,
 )
-
 
 # ── MI output parsing tests ──
 
@@ -151,8 +149,6 @@ class TestGdbClientAsyncExec:
     def setup_method(self):
         self.events = []
         # Mock main_thread_call since we can't import gi
-        import debugger.gdb_debugger as mod
-
         self._orig = None
         self.client = GdbClient(lambda e, b: self.events.append((e, b)))
 
@@ -187,18 +183,14 @@ class TestGdbClientResolve:
             with open(os.path.join(tmpdir, "Makefile"), "w") as f:
                 f.write("all:\n\techo hello\n")
 
-            result = self.client._find_makefile_dir(
-                os.path.join(src_dir, "main.c"), tmpdir
-            )
+            result = self.client._find_makefile_dir(os.path.join(src_dir, "main.c"), tmpdir)
             assert result == tmpdir
 
     def test_find_makefile_dir_missing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             src_dir = os.path.join(tmpdir, "src")
             os.makedirs(src_dir)
-            result = self.client._find_makefile_dir(
-                os.path.join(src_dir, "main.c"), tmpdir
-            )
+            result = self.client._find_makefile_dir(os.path.join(src_dir, "main.c"), tmpdir)
             assert result is None
 
     def test_find_binary_from_makefile(self):
@@ -221,7 +213,6 @@ class TestGdbClientCompileSingle:
     def test_compile_c_file(self):
         events = []
         # We need to mock main_thread_call for this test
-        import debugger.gdb_debugger as mod
         import shared.main_thread as mt
 
         orig = mt.main_thread_call

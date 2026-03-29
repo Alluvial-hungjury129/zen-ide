@@ -80,6 +80,10 @@ def _rebuild_global_css():
         .{_CSS_CLASS}.zen-btn-icon {{
             min-width: {ZEN_BUTTON_HEIGHT}px;
             padding: 0;
+            border: none;
+            outline: none;
+            box-shadow: none;
+            background: transparent;
         }}
         .{_CSS_CLASS}.zen-btn-icon > label {{
             font-size: {ZEN_BUTTON_ICON_SIZE}px;
