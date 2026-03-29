@@ -6,7 +6,7 @@ and debug console. Registered via SplitPanelManager.
 
 import os
 
-from gi.repository import Gtk, Pango
+from gi.repository import Gdk, Gtk, Pango
 
 from icons import IconsManager
 from shared.ui import ZenButton
@@ -30,6 +30,13 @@ class DebugPanel(Gtk.Box):
         self.add_css_class("debug-panel")
 
         theme = get_theme()
+        from fonts import get_font_settings
+
+        font_settings = get_font_settings("editor")
+        font_family = font_settings["family"]
+        self._font_desc = Pango.FontDescription.from_string(f"{font_family} 10")
+        self._font_attrs = Pango.AttrList.new()
+        self._font_attrs.insert(Pango.attr_font_desc_new(self._font_desc))
 
         # -- Toolbar --
         self._toolbar = self._create_toolbar()
@@ -65,24 +72,34 @@ class DebugPanel(Gtk.Box):
         self._var_tree.add_css_class("debug-var-tree")
 
         # Columns: Name, Value, Type
-        name_col = Gtk.TreeViewColumn("Name", Gtk.CellRendererText(), text=0)
-        name_col.set_resizable(True)
-        name_col.set_min_width(80)
-        self._var_tree.append_column(name_col)
+        for col_name, col_idx, min_w in [("Name", 0, 80), ("Value", 1, 100), ("Type", 2, 0)]:
+            renderer = Gtk.CellRendererText()
+            renderer.set_property("font-desc", self._font_desc)
+            col = Gtk.TreeViewColumn(col_name, renderer, text=col_idx)
+            col.set_resizable(True)
+            if min_w:
+                col.set_min_width(min_w)
+            self._var_tree.append_column(col)
 
-        value_col = Gtk.TreeViewColumn("Value", Gtk.CellRendererText(), text=1)
-        value_col.set_resizable(True)
-        value_col.set_min_width(100)
-        self._var_tree.append_column(value_col)
-
-        type_col = Gtk.TreeViewColumn("Type", Gtk.CellRendererText(), text=2)
-        type_col.set_resizable(True)
-        self._var_tree.append_column(type_col)
+        # Force font on TreeView column headers via inline CSS
+        css = Gtk.CssProvider()
+        css.load_from_string(
+            f"treeview header button {{ font-family: '{font_family}'; font-size: 10pt; }}"
+        )
+        self._var_tree.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
 
         # TreeStore: name, value, type, variables_reference (hidden)
         self._var_store = Gtk.TreeStore(str, str, str, int)
         self._var_tree.set_model(self._var_store)
         self._var_tree.connect("row-expanded", self._on_variable_expanded)
+        self._var_tree.set_activate_on_single_click(True)
+        self._var_tree.connect("row-activated", self._on_var_row_activated)
+
+        # Key controller so Left/Right expand/collapse instead of scrolling
+        key_ctrl = Gtk.EventControllerKey.new()
+        key_ctrl.connect("key-pressed", self._on_var_key_pressed)
+        self._var_tree.add_controller(key_ctrl)
+
         var_scroll.set_child(self._var_tree)
 
         # Breakpoints section
@@ -146,6 +163,7 @@ class DebugPanel(Gtk.Box):
         self._status_label.set_hexpand(True)
         self._status_label.set_halign(Gtk.Align.END)
         self._status_label.add_css_class("debug-status")
+        self._status_label.set_attributes(self._font_attrs)
         toolbar.append(self._status_label)
 
         # Close button
@@ -235,12 +253,14 @@ class DebugPanel(Gtk.Box):
             name_label.set_halign(Gtk.Align.START)
             name_label.set_hexpand(True)
             name_label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+            name_label.set_attributes(self._font_attrs)
             box.append(name_label)
 
             # File:line
             basename = os.path.basename(frame.source) if frame.source else ""
             loc_label = Gtk.Label(label=f"{basename}:{frame.line}")
             loc_label.add_css_class("dim-label")
+            loc_label.set_attributes(self._font_attrs)
             box.append(loc_label)
 
             row.set_child(box)
@@ -299,6 +319,46 @@ class DebugPanel(Gtk.Box):
                 if var.variables_reference > 0:
                     self._var_store.append(var_iter, ["...", "", "", 0])
 
+    def _on_var_row_activated(self, tree_view, path, column) -> None:
+        """Toggle expand/collapse on double-click (row-activated)."""
+        if tree_view.row_expanded(path):
+            tree_view.collapse_row(path)
+        else:
+            tree_view.expand_row(path, False)
+
+    def _on_var_key_pressed(self, controller, keyval, keycode, state) -> bool:
+        """Handle Left/Right keys for expand/collapse instead of horizontal scroll."""
+        sel = self._var_tree.get_selection()
+        model, tree_iter = sel.get_selected()
+        if tree_iter is None:
+            return False
+
+        path = model.get_path(tree_iter)
+
+        if keyval == Gdk.KEY_Right:
+            if not self._var_tree.row_expanded(path):
+                self._var_tree.expand_row(path, False)
+            else:
+                # Move to first child
+                child = model.iter_children(tree_iter)
+                if child:
+                    child_path = model.get_path(child)
+                    self._var_tree.set_cursor(child_path, None, False)
+            return True
+
+        if keyval == Gdk.KEY_Left:
+            if self._var_tree.row_expanded(path):
+                self._var_tree.collapse_row(path)
+            else:
+                # Move to parent
+                parent = model.iter_parent(tree_iter)
+                if parent:
+                    parent_path = model.get_path(parent)
+                    self._var_tree.set_cursor(parent_path, None, False)
+            return True
+
+        return False
+
     # -- Breakpoints list --
 
     def _refresh_breakpoints_list(self) -> None:
@@ -337,6 +397,7 @@ class DebugPanel(Gtk.Box):
                 label.set_halign(Gtk.Align.START)
                 label.set_hexpand(True)
                 label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+                label.set_attributes(self._font_attrs)
                 box.append(label)
 
                 # Click to navigate
@@ -406,14 +467,14 @@ class DebugPanel(Gtk.Box):
 
     # -- Helpers --
 
-    @staticmethod
-    def _create_section_label(text: str) -> Gtk.Label:
+    def _create_section_label(self, text: str) -> Gtk.Label:
         label = Gtk.Label(label=text)
         label.set_halign(Gtk.Align.START)
         label.set_margin_start(8)
         label.set_margin_top(4)
         label.set_margin_bottom(2)
         label.add_css_class("dim-label")
+        label.set_attributes(self._font_attrs)
         return label
 
     # -- Panel show/hide (required by SplitPanelManager) --

@@ -213,6 +213,7 @@ class EditorViewTabsMixin:
             minimap.set_view(tab.view)
             minimap.set_size_request(MINIMAP_WIDTH, -1)
             editor_box.append(minimap)
+            tab._minimap = minimap
 
             from ..editor_minimap import EditorMinimap
 

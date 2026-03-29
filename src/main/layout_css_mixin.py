@@ -405,6 +405,114 @@ class LayoutCssMixin:
                 border: 2px solid {theme.border_focus};
                 transition: border-color 150ms ease-in-out;
             }}
+            /* ── Debug panel ── */
+            .debug-panel {{
+                background-color: {theme.panel_bg};
+                color: {theme.fg_color};
+                font-family: '{font_family}';
+                font-size: 10pt;
+            }}
+            .debug-toolbar {{
+                background-color: {theme.panel_bg};
+                border-bottom: 1px solid {theme.border_color};
+            }}
+            .debug-toolbar-btn {{
+                color: {theme.fg_color};
+            }}
+            .debug-status {{
+                color: {theme.fg_dim};
+                font-size: 10pt;
+            }}
+            /* Call stack */
+            .debug-stack-list {{
+                background-color: {theme.panel_bg};
+                color: {theme.fg_color};
+                font-family: '{font_family}';
+                font-size: 10pt;
+            }}
+            .debug-stack-list row {{
+                background-color: transparent;
+                color: {theme.fg_color};
+                padding: 2px 4px;
+            }}
+            .debug-stack-list row:selected {{
+                background-color: {theme.selection_bg};
+            }}
+            .debug-stack-list row:hover {{
+                background-color: {theme.hover_bg};
+            }}
+            .debug-stack-list .dim-label {{
+                color: {theme.fg_dim};
+            }}
+            .debug-panel .dim-label {{
+                color: {theme.fg_dim};
+                font-family: '{font_family}';
+                font-size: 10pt;
+            }}
+            /* Variables tree */
+            .debug-var-tree {{
+                background-color: {theme.panel_bg};
+                color: {theme.fg_color};
+                font-family: '{font_family}';
+                font-size: 10pt;
+            }}
+            .debug-var-tree > header > button,
+            .debug-var-tree header button {{
+                background-color: {theme.panel_bg};
+                color: {theme.fg_dim};
+                border-bottom: 1px solid {theme.border_color};
+                font-family: '{font_family}';
+                font-size: 10pt;
+            }}
+            .debug-var-tree .cell {{
+                color: {theme.fg_color};
+            }}
+            /* Breakpoints list */
+            .debug-bp-list {{
+                background-color: {theme.panel_bg};
+                color: {theme.fg_color};
+                font-family: '{font_family}';
+                font-size: 10pt;
+            }}
+            .debug-bp-list row {{
+                background-color: transparent;
+                color: {theme.fg_color};
+                padding: 1px 4px;
+            }}
+            .debug-bp-list row:hover {{
+                background-color: {theme.hover_bg};
+            }}
+            /* Debug console */
+            .debug-console-output {{
+                background-color: {theme.panel_bg};
+                color: {theme.fg_color};
+                font-family: '{font_family}';
+                font-size: 10pt;
+            }}
+            .debug-console-output text {{
+                background-color: {theme.panel_bg};
+                color: {theme.fg_color};
+            }}
+            .debug-console-prompt {{
+                color: {theme.accent_color};
+                font-family: '{font_family}';
+                font-size: 10pt;
+            }}
+            .debug-console-input {{
+                background-color: {theme.main_bg};
+                color: {theme.fg_color};
+                border: 1px solid {theme.border_color};
+                border-radius: 4px;
+                font-family: '{font_family}';
+                font-size: 10pt;
+            }}
+            .debug-console-input:focus-within {{
+                border-color: {theme.accent_color};
+            }}
+            .debug-console-input > text {{
+                background: transparent;
+                color: {theme.fg_color};
+            }}
             /* Nerd Font fallback for button/label icons */
             {self._nerd_font_css(font_family)}
         """

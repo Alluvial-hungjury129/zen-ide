@@ -331,8 +331,8 @@ class WindowLayoutMixin(LayoutCssMixin, LayoutDndMixin):
         self.split_panels.register(
             "debug",
             None,
-            lambda: self._show_end_child_panel(self.debug_panel),
-            lambda: self._hide_end_child_panel(self.debug_panel),
+            lambda: (self._show_end_child_panel(self.debug_panel), self.editor_view.set_minimap_visible(False)),
+            lambda: (self._hide_end_child_panel(self.debug_panel), self.editor_view.set_minimap_visible(True)),
         )
 
     def _lock_paned_position(self, paned, position):

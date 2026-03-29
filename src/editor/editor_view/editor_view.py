@@ -198,6 +198,14 @@ class EditorView(
                 return tab
         return None
 
+    def set_minimap_visible(self, visible: bool):
+        """Show or hide the minimap and its indicator on all tabs."""
+        for tab in self.tabs.values():
+            if hasattr(tab, "_minimap") and tab._minimap:
+                tab._minimap.set_visible(visible)
+            if hasattr(tab, "_minimap_indicator") and tab._minimap_indicator:
+                tab._minimap_indicator.set_visible(visible)
+
     def close_current_tab(self):
         """Close the current tab."""
         page_num = self.notebook.get_current_page()
