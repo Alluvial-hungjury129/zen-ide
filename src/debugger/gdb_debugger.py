@@ -34,6 +34,9 @@ class GdbClient:
         # Variable reference tracking (mirrors BdbClient's approach)
         self._var_refs: dict[int, str] = {}  # ref_id -> gdb varobj name
         self._var_ref_counter = 0
+        # Console stream capture for scope queries
+        self._console_capture: list[str] | None = None
+        self._console_capture_token: int | None = None
 
     def start(
         self,
@@ -80,6 +83,10 @@ class GdbClient:
         self._send_mi("-gdb-set confirm off")
         self._send_mi("-gdb-set pagination off")
         self._send_mi("-gdb-set print pretty on")
+        # Enable pretty printers for MI varobj commands — without this,
+        # -var-list-children shows raw STL internals (_Vector_base etc.)
+        # instead of the actual elements
+        self._send_mi("-enable-pretty-printing")
 
     def stop(self) -> None:
         """Terminate GDB."""
@@ -165,12 +172,21 @@ class GdbClient:
             self._seq += 1
             token = self._seq
             self._pending[token] = future
-        self._send_mi(f"{token}-stack-list-variables --simple-values")
+        self._send_mi(f"{token}-stack-list-variables --skip-unavailable --simple-values")
         return future
 
     def get_variables(self, ref: int) -> Future:
         """Expand a variable reference (children of a struct/array)."""
         future: Future = Future()
+
+        # Scope reference — serve stored variables directly
+        scope_vars = getattr(self, "_scope_vars", {})
+        if ref in scope_vars:
+            variables = self._resolve_scope_variables(scope_vars[ref])
+            future.set_result({"variables": variables})
+            return future
+
+        # GDB varobj — list its children
         varobj_name = self._var_refs.get(ref, "")
         if not varobj_name:
             future.set_result({"variables": []})
@@ -457,6 +473,10 @@ class GdbClient:
         m = re.match(r'^~"(.*)"$', line)
         if m:
             text = _mi_unescape(m.group(1))
+            # Capture console output if a scope query is active
+            if self._console_capture is not None:
+                self._console_capture.append(text)
+                return
             main_thread_call(self._on_event, "output", {"text": text, "category": "stdout"})
             return
 
@@ -473,10 +493,27 @@ class GdbClient:
 
     def _handle_result(self, token: int, status: str, payload: dict) -> None:
         """Handle a result record (response to a token-prefixed command)."""
+        captured = None
         with self._lock:
             future = self._pending.pop(token, None)
+            # Finalize console capture if this token owns it
+            if self._console_capture_token == token:
+                captured = self._console_capture
+                self._console_capture = None
+                self._console_capture_token = None
 
         if not future or future.done():
+            return
+
+        # Scope query — parse ZENSCOPE output from gdb_scope_helper.py
+        if captured is not None:
+            symbols = set()
+            for line in captured:
+                if line.startswith("ZENSCOPE:"):
+                    names = line[len("ZENSCOPE:") :].strip()
+                    if names:
+                        symbols.update(names.split())
+            future.set_result({"symbols": symbols})
             return
 
         if status == "done":
@@ -519,28 +556,13 @@ class GdbClient:
 
         # Variable children (from -var-list-children)
         if "children" in payload:
-            variables = []
-            children = payload["children"]
-            if isinstance(children, list):
-                for child_entry in children:
-                    child = child_entry.get("child", child_entry) if isinstance(child_entry, dict) else {}
-                    name = child.get("exp", child.get("name", ""))
-                    value = child.get("value", "")
-                    vtype = child.get("type", "")
-                    numchild = int(child.get("numchild", 0))
-                    ref = 0
-                    if numchild > 0:
-                        varobj_name = child.get("name", "")
-                        ref = self._store_varobj(varobj_name)
-                    variables.append(
-                        {
-                            "name": name,
-                            "value": value,
-                            "type": vtype,
-                            "ref": ref,
-                        }
-                    )
+            variables = self._collect_children(payload["children"])
             return {"variables": variables}
+
+        # Variable object creation (from -var-create) — must check before
+        # "value" since varobj responses also contain a value key
+        if "numchild" in payload:
+            return payload
 
         # Expression evaluation
         if "value" in payload:
@@ -591,9 +613,12 @@ class GdbClient:
             file_path = frame.get("fullname", frame.get("file", ""))
             line = int(frame.get("line", 0))
 
-            # Clear old variable objects for the new stop
+            # Delete stale GDB varobjs and clear Python-side refs
+            self._delete_all_varobjs()
             self._var_refs.clear()
             self._var_ref_counter = 0
+            if hasattr(self, "_scope_vars"):
+                self._scope_vars.clear()
 
             main_thread_call(
                 self._on_event,
@@ -634,40 +659,143 @@ class GdbClient:
         self._var_refs[ref] = varobj_name
         return ref
 
-    def _get_scope_variables(self, ref: int) -> list[dict]:
-        """Get variables for a scope reference (used by overridden get_variables)."""
-        scope_vars = getattr(self, "_scope_vars", {})
-        raw_vars = scope_vars.get(ref, [])
+    def _resolve_scope_variables(self, raw_vars: list[dict]) -> list[dict]:
+        """Convert raw scope variables into the format DebugSession expects.
+
+        Uses DWARF scope info (info scope *$pc) to filter out variables
+        not yet declared at the current line, then creates GDB varobjs
+        for expandable types.
+        """
+        # Ask GDB which symbols are in scope at the exact PC
+        in_scope: set[str] | None = None
+        try:
+            result = self._get_scope_symbols().result(timeout=2)
+            in_scope = result.get("symbols")
+        except Exception:
+            pass
+
         variables = []
         for v in raw_vars:
             name = v.get("name", "")
             value = v.get("value", "")
             vtype = v.get("type", "")
 
-            # Create a GDB varobj for expandable types
-            ref_id = 0
-            if vtype and not vtype.startswith(
-                ("int", "char", "float", "double", "bool", "long", "short", "unsigned", "_Bool", "size_t", "ssize_t")
-            ):
-                # Might be expandable — create varobj
-                try:
-                    self._send_mi_create_varobj(name, ref_id)
-                except Exception:
-                    pass
+            # Filter out variables not in scope at the current PC
+            # Empty set means the query failed — skip filtering
+            if in_scope and name not in in_scope:
+                continue
+
+            try:
+                varobj_future = self._create_varobj(name)
+                result = varobj_future.result(timeout=2)
+                if "error" in result:
+                    continue
+                varobj_name = result.get("name", "")
+                numchild = int(result.get("numchild", 0))
+                is_dynamic = result.get("dynamic", "") == "1"
+
+                ref = 0
+                if (numchild > 0 or is_dynamic) and varobj_name:
+                    ref = self._store_varobj(varobj_name)
+
+                # Prefer varobj value — more accurate than --simple-values
+                varobj_value = result.get("value", "")
+                if varobj_value:
+                    value = varobj_value
+            except Exception:
+                continue
 
             variables.append(
                 {
                     "name": name,
                     "value": value,
                     "type": vtype,
-                    "ref": ref_id,
+                    "ref": ref,
                 }
             )
         return variables
 
-    def _send_mi_create_varobj(self, expr: str, parent_ref: int) -> None:
-        """Create a GDB variable object for inspection."""
-        self._send_mi(f"-var-create - * {expr}")
+    def _get_scope_symbols(self) -> Future:
+        """Get variable names in scope at the current PC.
+
+        Sources a GDB Python script that walks the lexical block chain
+        and filters by declaration line (symbol.line <= stop line).
+        """
+        future: Future = Future()
+        script = os.path.join(os.path.dirname(__file__), "gdb_scope_helper.py")
+        with self._lock:
+            self._seq += 1
+            token = self._seq
+            self._pending[token] = future
+            self._console_capture = []
+            self._console_capture_token = token
+        self._send_mi(f'{token}-interpreter-exec console "source {script}"')
+        return future
+
+    _ACCESS_SPECIFIERS = frozenset({"public", "private", "protected"})
+
+    def _collect_children(self, children) -> list[dict]:
+        """Parse child entries, flattening access specifiers (public/private/protected).
+
+        GDB inserts synthetic access-specifier nodes between a class and its
+        members.  We skip those nodes and store their varobj ref so expansion
+        transparently shows the real members.
+        """
+        if not isinstance(children, list):
+            return []
+        variables = []
+        for child_entry in children:
+            child = child_entry.get("child", child_entry) if isinstance(child_entry, dict) else {}
+            name = child.get("exp", child.get("name", ""))
+            numchild = int(child.get("numchild", 0))
+            varobj_name = child.get("name", "")
+
+            # Access-specifier node — store its varobj as a pass-through
+            # so expanding the parent will list the real members via
+            # -var-list-children on this specifier's varobj
+            if name in self._ACCESS_SPECIFIERS and numchild > 0 and varobj_name:
+                ref = self._store_varobj(varobj_name)
+                variables.append(
+                    {
+                        "name": name,
+                        "value": "",
+                        "type": "",
+                        "ref": ref,
+                        "_access_specifier": True,
+                    }
+                )
+                continue
+
+            value = child.get("value", "")
+            vtype = child.get("type", "")
+            ref = 0
+            if numchild > 0 and varobj_name:
+                ref = self._store_varobj(varobj_name)
+            variables.append(
+                {
+                    "name": name,
+                    "value": value,
+                    "type": vtype,
+                    "ref": ref,
+                }
+            )
+        return variables
+
+    def _delete_all_varobjs(self) -> None:
+        """Delete all GDB-side variable objects to prevent accumulation."""
+        for varobj_name in self._var_refs.values():
+            if not varobj_name.startswith("__scope_"):
+                self._send_mi(f"-var-delete {varobj_name}")
+
+    def _create_varobj(self, expr: str) -> Future:
+        """Create a GDB variable object and return a Future for the result."""
+        future: Future = Future()
+        with self._lock:
+            self._seq += 1
+            token = self._seq
+            self._pending[token] = future
+        self._send_mi(f"{token}-var-create - * {expr}")
+        return future
 
 
 # ── GDB/MI output parsing ──────────────────────────────────────────────────

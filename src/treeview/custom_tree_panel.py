@@ -6,17 +6,15 @@ inline editing, and filesystem data loading.
 """
 
 import sys
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, Optional, Set
 
-from gi.repository import Gdk, GLib, Graphene, Gsk, Gtk, Pango
+from gi.repository import Gdk, Graphene, Gsk, Gtk
 
 from icons import IconsManager
-from shared.settings import get_setting
 from shared.ui.zen_tree import ZenTree
 from shared.utils import hex_to_rgba, tuple_to_gdk_rgba
 from themes import get_theme
 from treeview.tree_icons import (
-    CHEVRON_COLOR,
     ICON_COLORS,
     get_git_status_colors,
     get_icon_set,
@@ -82,7 +80,6 @@ class CustomTreePanel(
 
     def _setup_icons(self):
         """Setup icon mappings."""
-        from icons import get_icon_font_name
 
         file_icons, name_icons, folder_closed, folder_open = get_icon_set()
         self._icon_map = {
@@ -159,9 +156,7 @@ class CustomTreePanel(
         # Chevron for directories
         if item.is_dir:
             chevron = self.chevron_expanded if item.expanded else self.chevron_collapsed
-            color = tuple_to_gdk_rgba(
-                self.ignored_color if item.git_status == "I" else self.chevron_color
-            )
+            color = tuple_to_gdk_rgba(self.ignored_color if item.git_status == "I" else self.chevron_color)
             layout.set_text(chevron, -1)
             snapshot.save()
             point.init(x, icon_y)
@@ -172,9 +167,7 @@ class CustomTreePanel(
 
         # File/folder icon
         icon_char, icon_color = self._get_icon_for_item(item)
-        color = tuple_to_gdk_rgba(
-            self.ignored_color if item.git_status == "I" else hex_to_rgba(icon_color)
-        )
+        color = tuple_to_gdk_rgba(self.ignored_color if item.git_status == "I" else hex_to_rgba(icon_color))
         layout.set_text(icon_char.strip(), -1)
         snapshot.save()
         point.init(x, icon_y)
@@ -288,7 +281,8 @@ class CustomTreePanel(
             rounded.init_from_rect(border_rect, 0)
             accent_rgba = tuple_to_gdk_rgba(accent)
             snapshot.append_border(
-                rounded, [1, 1, 1, 1],
+                rounded,
+                [1, 1, 1, 1],
                 [accent_rgba, accent_rgba, accent_rgba, accent_rgba],
             )
         else:

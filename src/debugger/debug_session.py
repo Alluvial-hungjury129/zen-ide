@@ -220,15 +220,31 @@ class DebugSession:
             return []
         try:
             result = self._client.get_variables(variables_reference).result(timeout=5)
-            return [
-                Variable(
-                    name=v["name"],
-                    value=v["value"],
-                    type=v.get("type", ""),
-                    variables_reference=v.get("ref", 0),
+            variables = []
+            for v in result.get("variables", []):
+                # Flatten GDB access-specifier nodes (public/private/protected)
+                # so members appear directly under the object
+                if v.get("_access_specifier") and v.get("ref", 0) > 0:
+                    inner = self._client.get_variables(v["ref"]).result(timeout=5)
+                    for iv in inner.get("variables", []):
+                        variables.append(
+                            Variable(
+                                name=iv["name"],
+                                value=iv["value"],
+                                type=iv.get("type", ""),
+                                variables_reference=iv.get("ref", 0),
+                            )
+                        )
+                    continue
+                variables.append(
+                    Variable(
+                        name=v["name"],
+                        value=v["value"],
+                        type=v.get("type", ""),
+                        variables_reference=v.get("ref", 0),
+                    )
                 )
-                for v in result.get("variables", [])
-            ]
+            return variables
         except Exception:
             return []
 

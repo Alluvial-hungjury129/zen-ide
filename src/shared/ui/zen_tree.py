@@ -33,8 +33,7 @@ _PRIMARY_MOD = Gdk.ModifierType.META_MASK if sys.platform == "darwin" else Gdk.M
 class ZenTreeItem:
     """Generic tree item for ZenTree."""
 
-    __slots__ = ("name", "depth", "parent", "expanded", "is_expandable",
-                 "children", "is_last", "data")
+    __slots__ = ("name", "depth", "parent", "expanded", "is_expandable", "children", "is_last", "data")
 
     def __init__(
         self,
@@ -189,6 +188,7 @@ class ZenTree(ThemeAwareMixin, Gtk.ScrolledWindow):
         # Text font
         self.text_font_desc = Pango.FontDescription.from_string(f"{family} {size}")
         from fonts import PANGO_WEIGHT_MAP
+
         pango_weight = PANGO_WEIGHT_MAP.get(weight, Pango.Weight.NORMAL)
         self.text_font_desc.set_weight(pango_weight)
 
@@ -646,9 +646,9 @@ class ZenTree(ThemeAwareMixin, Gtk.ScrolledWindow):
         start = self.items.index(anchor)
         end = self.items.index(item)
         if start <= end:
-            range_items = self.items[start:end + 1]
+            range_items = self.items[start : end + 1]
         else:
-            range_items = self.items[end:start + 1]
+            range_items = self.items[end : start + 1]
         self._set_selection(range_items, primary_item=item, anchor_item=anchor)
 
     def _prune_selection_to_visible_items(self):
@@ -767,10 +767,7 @@ class ZenTree(ThemeAwareMixin, Gtk.ScrolledWindow):
                 item_visible = item_bottom > scroll_y and item_top < scroll_y + view_height
             else:
                 tolerance = 1.0
-                item_visible = (
-                    item_top >= scroll_y - tolerance
-                    and item_bottom <= scroll_y + view_height + tolerance
-                )
+                item_visible = item_top >= scroll_y - tolerance and item_bottom <= scroll_y + view_height + tolerance
 
             if item_visible:
                 if self._scroll_animation_id is not None:

@@ -271,7 +271,6 @@ class ViewActionsMixin:
             self._clear_debug_decorations()
 
         self.debug_panel.on_session_state_changed(session)
-        self.status_bar.set_debug_state(session.state.value)
 
     def _on_debug_stop(self, action, param):
         """Stop debugging (Shift+F5)."""
@@ -279,7 +278,6 @@ class ViewActionsMixin:
         if session:
             session.stop()
             self._clear_debug_decorations()
-            self.status_bar.set_debug_state("")
 
             from dev_pad.activity_store import log_debug_activity
 

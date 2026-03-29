@@ -6,12 +6,12 @@ and debug console. Registered via SplitPanelManager.
 
 import os
 
-from gi.repository import Gdk, Graphene, Gtk, Pango
+from gi.repository import GLib, Graphene, Gtk, Pango
 
 from icons import IconsManager
 from shared.ui import ZenButton
 from shared.ui.zen_tree import ZenTree, ZenTreeItem
-from shared.utils import hex_to_rgba, tuple_to_gdk_rgba
+from shared.utils import tuple_to_gdk_rgba
 from themes import get_theme
 
 from .breakpoint_manager import Breakpoint, get_breakpoint_manager
@@ -20,11 +20,14 @@ from .debug_session import DebugSession, SessionState
 
 
 class _DebugVarTree(ZenTree):
-    """ZenTree subclass for debug variable inspection."""
+    """ZenTree subclass for debug variable inspection with text wrapping."""
+
+    _WRAP_PADDING = 6  # vertical padding for wrapped rows
 
     def __init__(self, session_getter):
         super().__init__(font_context="editor")
         self._session_getter = session_getter
+        self._item_positions: list[tuple[float, float]] = []  # (y, height) per item
 
     def refresh(self, session):
         """Rebuild the variable tree from session scopes."""
@@ -79,13 +82,156 @@ class _DebugVarTree(ZenTree):
             return
         self._load_scope_vars(session, item)
 
-    def _draw_item_row(self, snapshot, layout, item, y, width):
-        """Draw variable row: chevron + name: value."""
+    # -- Variable-height rendering overrides --
+
+    def _get_item_at_y(self, y):
+        """Binary search through computed positions for click hit-testing."""
+        positions = self._item_positions
+        if not positions or len(positions) != len(self.items):
+            return super()._get_item_at_y(y)
+        lo, hi = 0, len(positions) - 1
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            iy, ih = positions[mid]
+            if y < iy:
+                hi = mid - 1
+            elif y >= iy + ih:
+                lo = mid + 1
+            else:
+                return self.items[mid]
+        return None
+
+    def _update_virtual_size(self):
+        """Use computed total height when available."""
+        positions = self._item_positions
+        if positions and len(positions) == len(self.items):
+            last_y, last_h = positions[-1]
+            self.drawing_area.set_size_request(-1, max(int(last_y + last_h), 100))
+        else:
+            super()._update_virtual_size()
+
+    def _ensure_visible(self, item, animate=False, _retries=0, _gen=-1):
+        """Scroll to make item visible using variable positions."""
+        positions = self._item_positions
+        if not positions or len(positions) != len(self.items):
+            return super()._ensure_visible(item, animate, _retries, _gen)
+        if _gen == -1:
+            self._ensure_visible_gen += 1
+            _gen = self._ensure_visible_gen
+        elif _gen != self._ensure_visible_gen:
+            return False
+        try:
+            idx = self.items.index(item)
+            vadj = self.get_vadjustment()
+            if not vadj:
+                return False
+            item_y, item_h = positions[idx]
+            page = vadj.get_page_size()
+            scroll_y = vadj.get_value()
+            if page <= 0:
+                if _retries < 5:
+                    GLib.idle_add(self._ensure_visible, item, animate, _retries + 1, _gen)
+                return False
+            if item_y >= scroll_y and item_y + item_h <= scroll_y + page:
+                return False
+            if item_y < scroll_y:
+                vadj.set_value(item_y)
+            else:
+                vadj.set_value(item_y + item_h - page)
+        except ValueError:
+            pass
+        return False
+
+    def _measure_row_height(self, layout, item, width):
+        """Measure height needed for an item's wrapped text."""
+        data = getattr(item, "data", None) or {}
+        value = data.get("value", "")
+        if not value:
+            return self.row_height
+
+        x = self.LEFT_PADDING + item.depth * self.INDENT_WIDTH + self.INDENT_WIDTH
+        avail = max(width - x - self.LEFT_PADDING, 60)
+
+        layout.set_font_description(self.text_font_desc)
+        layout.set_width(int(avail * Pango.SCALE))
+        layout.set_wrap(Pango.WrapMode.CHAR)
+        layout.set_text(f"{item.name}: {value}", -1)
+        _, logical = layout.get_pixel_extents()
+        layout.set_width(-1)
+        layout.set_wrap(Pango.WrapMode.WORD)
+
+        return max(self.row_height, logical.height + self._WRAP_PADDING)
+
+    def _on_snapshot(self, snapshot, width, height):
+        """Draw tree with variable-height wrapped rows."""
+        rect = Graphene.Rect()
+        rect.init(0, 0, width, height)
+        snapshot.append_color(tuple_to_gdk_rgba(self.bg_color), rect)
+
+        if not self.items:
+            self._item_positions = []
+            return
+
+        pango_ctx = self.drawing_area.get_pango_context()
+        layout = Pango.Layout.new(pango_ctx)
+
+        # Cache font metrics on first draw (same as base class)
+        if self._cached_text_height is None:
+            layout.set_font_description(self.text_font_desc)
+            layout.set_text("Ay", -1)
+            text_ink, text_logical = layout.get_pixel_extents()
+            self._cached_text_height = text_logical.height
+            self._cached_text_ink_center = text_ink.y + text_ink.height / 2
+            layout.set_font_description(self.icon_font_desc)
+            layout.set_text(self.chevron_expanded, -1)
+            icon_ink, icon_logical = layout.get_pixel_extents()
+            self._cached_icon_height = icon_logical.height
+            self._cached_icon_ink_center = icon_ink.y + icon_ink.height / 2
+
+        vadj = self.get_vadjustment()
+        scroll_y = vadj.get_value() if vadj else 0
+        view_bottom = scroll_y + height
+
+        positions = []
+        y = 0.0
         point = Graphene.Point()
-        text_height = self._cached_text_height
-        text_y = y + (self.row_height - text_height) / 2
-        text_ink_center_y = text_y + self._cached_text_ink_center
-        icon_y = text_ink_center_y - self._cached_icon_ink_center
+
+        for item in self.items:
+            row_h = self._measure_row_height(layout, item, width)
+            positions.append((y, row_h))
+
+            # Only draw visible rows
+            if y + row_h > scroll_y and y < view_bottom:
+                # Selection / hover background
+                if self._is_item_selected(item):
+                    hide = (
+                        self.drawing_area.has_focus()
+                        and not self._cursor_blinker.cursor_visible
+                        and item == self.selected_item
+                    )
+                    if not hide:
+                        rect.init(0, y, width, row_h)
+                        snapshot.append_color(tuple_to_gdk_rgba(self.selected_bg), rect)
+                elif item == self.hover_item:
+                    rect.init(0, y, width, row_h)
+                    snapshot.append_color(tuple_to_gdk_rgba(self.hover_bg), rect)
+
+                # Draw content
+                self._draw_var_row(snapshot, layout, point, item, y, width)
+
+            y += row_h
+
+        self._item_positions = positions
+
+        # Sync virtual size
+        total_h = max(int(y), 100)
+        self.drawing_area.set_size_request(-1, total_h)
+
+    def _draw_var_row(self, snapshot, layout, point, item, y, width):
+        """Draw a single variable row with chevron and wrapped name: value."""
+        # Align chevron to first line
+        first_line_y = y + (self.row_height - self._cached_text_height) / 2
+        icon_y = first_line_y + self._cached_text_ink_center - self._cached_icon_ink_center
 
         x = self.LEFT_PADDING + item.depth * self.INDENT_WIDTH
 
@@ -101,47 +247,52 @@ class _DebugVarTree(ZenTree):
             snapshot.restore()
         x += self.INDENT_WIDTH
 
+        # Text
         layout.set_font_description(self.text_font_desc)
-
         data = getattr(item, "data", None) or {}
         value = data.get("value", "")
+        avail = max(width - x - self.LEFT_PADDING, 60)
+
+        layout.set_width(int(avail * Pango.SCALE))
+        layout.set_wrap(Pango.WrapMode.CHAR)
+
+        text_y = y + self._WRAP_PADDING // 2
 
         if value:
-            # Draw name
-            layout.set_text(item.name, -1)
-            _, logical = layout.get_pixel_extents()
-            name_width = logical.width
+            full_text = f"{item.name}: {value}"
+            layout.set_text(full_text, -1)
 
-            snapshot.save()
-            point.init(x, text_y)
-            snapshot.translate(point)
-            snapshot.append_layout(layout, tuple_to_gdk_rgba(self.fg_color))
-            snapshot.restore()
-
-            # Draw ": value" in dimmer color
-            val_display = value
-            if len(val_display) > 100:
-                val_display = val_display[:97] + "\u2026"
-            layout.set_text(f": {val_display}", -1)
-            dim = (
-                self.fg_color[0] * 0.6,
-                self.fg_color[1] * 0.6,
-                self.fg_color[2] * 0.6,
-                self.fg_color[3],
+            # Dim the value portion
+            attrs = Pango.AttrList.new()
+            sep_bytes = len(item.name.encode("utf-8")) + 2  # ": "
+            total_bytes = len(full_text.encode("utf-8"))
+            dim = Pango.attr_foreground_new(
+                int(self.fg_color[0] * 0.6 * 65535),
+                int(self.fg_color[1] * 0.6 * 65535),
+                int(self.fg_color[2] * 0.6 * 65535),
             )
+            dim.start_index = sep_bytes
+            dim.end_index = total_bytes
+            attrs.insert(dim)
+            layout.set_attributes(attrs)
+
             snapshot.save()
-            point.init(x + name_width, text_y)
+            point.init(x, text_y)
             snapshot.translate(point)
-            snapshot.append_layout(layout, tuple_to_gdk_rgba(dim))
+            snapshot.append_layout(layout, tuple_to_gdk_rgba(self.fg_color))
             snapshot.restore()
+            layout.set_attributes(None)
         else:
-            # Scope header (no value)
             layout.set_text(item.name, -1)
             snapshot.save()
             point.init(x, text_y)
             snapshot.translate(point)
             snapshot.append_layout(layout, tuple_to_gdk_rgba(self.fg_color))
             snapshot.restore()
+
+        # Reset layout state
+        layout.set_width(-1)
+        layout.set_wrap(Pango.WrapMode.WORD)
 
 
 class DebugPanel(Gtk.Box):
@@ -290,7 +441,7 @@ class DebugPanel(Gtk.Box):
             SessionState.INITIALIZING: "Starting...",
             SessionState.RUNNING: "Running",
             SessionState.STOPPED: "Paused",
-            SessionState.TERMINATED: "",
+            SessionState.TERMINATED: "Terminated",
         }
         self._status_label.set_text(state_labels.get(state, ""))
 
@@ -468,7 +619,6 @@ class DebugPanel(Gtk.Box):
         """Called when the debug session state changes."""
         self._update_toolbar_state()
         if session.state == SessionState.TERMINATED:
-            self._status_label.set_text("")
             self._clear_call_stack()
             self._var_tree.set_roots([])
 
@@ -486,9 +636,6 @@ class DebugPanel(Gtk.Box):
         # Navigate to stopped location
         if file_path and os.path.isfile(file_path):
             self._window.editor_view.open_file(file_path, line)
-
-        # Update status
-        self._status_label.set_text("")
 
     # -- Helpers --
 

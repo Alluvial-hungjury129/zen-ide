@@ -202,12 +202,14 @@ class NodeClient:
             loc = cf.get("location", {})
             script_id = loc.get("scriptId", "")
             file_path = self._scripts.get(script_id, _file_url_to_path(cf.get("url", "")))
-            frames.append({
-                "id": i,
-                "name": cf.get("functionName", "") or "<anonymous>",
-                "file": file_path,
-                "line": loc.get("lineNumber", 0) + 1,  # 1-based
-            })
+            frames.append(
+                {
+                    "id": i,
+                    "name": cf.get("functionName", "") or "<anonymous>",
+                    "file": file_path,
+                    "line": loc.get("lineNumber", 0) + 1,  # 1-based
+                }
+            )
         future.set_result({"frames": frames})
         return future
 
@@ -275,12 +277,14 @@ class NodeClient:
                     if child_oid:
                         var_ref = self._store_obj_ref(child_oid)
 
-                    variables.append({
-                        "name": name,
-                        "value": str(value),
-                        "type": display_type,
-                        "ref": var_ref,
-                    })
+                    variables.append(
+                        {
+                            "name": name,
+                            "value": str(value),
+                            "type": display_type,
+                            "ref": var_ref,
+                        }
+                    )
                 result_future.set_result({"variables": variables})
             except Exception:
                 result_future.set_result({"variables": []})
@@ -348,9 +352,11 @@ class NodeClient:
             main_thread_call(
                 self._on_event,
                 "output",
-                {"text": "TypeScript: install 'tsx' globally (npm i -g tsx) for best experience.\n"
-                         "Falling back to node (may not work for .ts files without a loader).\n",
-                 "category": "console"},
+                {
+                    "text": "TypeScript: install 'tsx' globally (npm i -g tsx) for best experience.\n"
+                    "Falling back to node (may not work for .ts files without a loader).\n",
+                    "category": "console",
+                },
             )
 
         return node, []
@@ -397,13 +403,18 @@ class NodeClient:
                 if not stripped:
                     continue
                 # Skip Node inspector boilerplate
-                if stripped.startswith(("Debugger listening on ws://",
-                                       "Debugger attached",
-                                       "For help, see: https://nodejs.org",
-                                       "Waiting for the debugger")):
+                if stripped.startswith(
+                    (
+                        "Debugger listening on ws://",
+                        "Debugger attached",
+                        "For help, see: https://nodejs.org",
+                        "Waiting for the debugger",
+                    )
+                ):
                     continue
                 if text.strip():
                     from shared.main_thread import main_thread_call
+
                     main_thread_call(self._on_event, "output", {"text": text, "category": "stderr"})
             except (OSError, ValueError):
                 break
@@ -418,6 +429,7 @@ class NodeClient:
                 text = line.decode("utf-8", errors="replace")
                 if text:
                     from shared.main_thread import main_thread_call
+
                     main_thread_call(self._on_event, "output", {"text": text, "category": "stdout"})
             except (OSError, ValueError):
                 break
@@ -471,6 +483,7 @@ class NodeClient:
 
         self._running = False
         from shared.main_thread import main_thread_call
+
         main_thread_call(self._on_event, "terminated", {"exit_code": 0})
 
     def _dispatch_cdp(self, msg: dict) -> None:
@@ -509,8 +522,10 @@ class NodeClient:
             exc = details.get("exception", {})
             text = exc.get("description", details.get("text", "Exception"))
             from shared.main_thread import main_thread_call
+
             main_thread_call(
-                self._on_event, "output",
+                self._on_event,
+                "output",
                 {"text": f"\n{text}\n", "category": "stderr"},
             )
 
@@ -549,8 +564,10 @@ class NodeClient:
         }.get(reason, "step")
 
         from shared.main_thread import main_thread_call
+
         main_thread_call(
-            self._on_event, "stopped",
+            self._on_event,
+            "stopped",
             {"file": file_path, "line": line, "reason": mapped_reason},
         )
 

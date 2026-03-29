@@ -41,8 +41,13 @@ class TestCreateDefaultConfig:
         assert config is not None
         assert config.type == "cppdbg"
 
+    def test_node_js_config(self):
+        config = create_default_config("/project/app.js")
+        assert config is not None
+        assert config.type == "node"
+        assert config.name == "Node: app.js"
+
     def test_unsupported_returns_none(self):
-        assert create_default_config("/project/app.js") is None
         assert create_default_config("/project/main.rs") is None
         assert create_default_config("/project/readme.txt") is None
 
