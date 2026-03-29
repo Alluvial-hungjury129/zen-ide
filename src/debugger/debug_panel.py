@@ -314,6 +314,9 @@ class DebugPanel(Gtk.Box):
 
     def _on_restart(self, btn):
         if self._session:
+            self._console.clear()
+            self._clear_call_stack()
+            self._var_tree.set_roots([])
             self._session.restart()
 
     def _on_stop(self, btn):
@@ -322,14 +325,17 @@ class DebugPanel(Gtk.Box):
 
     # -- Call Stack --
 
-    def update_call_stack(self, frames: list) -> None:
-        """Update the call stack display."""
-        # Remove all existing rows
+    def _clear_call_stack(self) -> None:
+        """Remove all rows from the call stack list."""
         while True:
             row = self._stack_list.get_row_at_index(0)
             if row is None:
                 break
             self._stack_list.remove(row)
+
+    def update_call_stack(self, frames: list) -> None:
+        """Update the call stack display."""
+        self._clear_call_stack()
 
         for i, frame in enumerate(frames):
             row = Gtk.ListBoxRow()
@@ -463,6 +469,8 @@ class DebugPanel(Gtk.Box):
         self._update_toolbar_state()
         if session.state == SessionState.TERMINATED:
             self._status_label.set_text("")
+            self._clear_call_stack()
+            self._var_tree.set_roots([])
 
     def on_session_stopped(self, session: DebugSession, thread_id: int, reason: str, file_path: str, line: int) -> None:
         """Called when execution stops (breakpoint hit, step completed)."""

@@ -138,6 +138,12 @@ class DebugSession:
         config = self._config
         file_path = config.program
         cwd = config.cwd
+        # Detach the old client's event callback before stopping.
+        # The reader thread fires a "terminated" event asynchronously
+        # via main_thread_call after the process dies — without this,
+        # that stale event would call self.stop() and kill the new session.
+        if self._client:
+            self._client._on_event = lambda *a: None
         self.stop()
         self.state = SessionState.IDLE
         self.start(file_path, cwd)
