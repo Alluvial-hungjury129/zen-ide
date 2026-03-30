@@ -80,6 +80,31 @@ class GitManager:
 
         return root
 
+    def get_repo_root_cached(self, path: str) -> Optional[str]:
+        """Return a cached repo root for *path*, or ``None`` if not cached.
+
+        Unlike ``get_repo_root`` this never spawns a subprocess — it only
+        checks the in-memory cache.  Used on the main thread where blocking
+        is unacceptable (e.g. AI terminal spawn).
+        """
+        if os.path.isfile(path):
+            folder_path = os.path.dirname(path)
+        else:
+            folder_path = path
+
+        now = time.time()
+        with self._lock:
+            if folder_path in self._repo_root_cache:
+                root, timestamp = self._repo_root_cache[folder_path]
+                if now - timestamp < self.REPO_ROOT_CACHE_TTL:
+                    return root
+            for _cached_folder, (cached_root, timestamp) in self._repo_root_cache.items():
+                if now - timestamp >= self.REPO_ROOT_CACHE_TTL:
+                    continue
+                if cached_root and folder_path.startswith(cached_root + os.sep):
+                    return cached_root
+        return None
+
     def _query_repo_root(self, folder_path: str) -> Optional[str]:
         """Query git for repo root"""
         try:
@@ -144,6 +169,19 @@ class GitManager:
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
             pass
         return "current"
+
+    def get_current_branch_cached(self, repo_root: str) -> str:
+        """Return cached branch name, or empty string if not cached.
+
+        Unlike ``get_current_branch`` this never spawns a subprocess.
+        """
+        now = time.time()
+        with self._lock:
+            if repo_root in self._branch_cache:
+                branch, timestamp = self._branch_cache[repo_root]
+                if now - timestamp < self.BRANCH_CACHE_TTL:
+                    return branch
+        return ""
 
     # -------------------------------------------------------------------------
     # File content at ref operations

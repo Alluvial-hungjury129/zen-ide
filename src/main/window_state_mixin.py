@@ -157,70 +157,49 @@ class WindowStateMixin(StartupOptimizerMixin, WindowPersistenceMixin):
 
         Called by ``AITerminalView`` at spawn time (for env vars / system
         prompt) and by the dynamic state-file writer on tab switch events.
+
+        Uses the fast path (no git subprocess calls) to avoid blocking the
+        main thread.  Git branch info is populated from the cache maintained
+        by ``_update_ide_state_file`` and is available after the first
+        background refresh completes.
         """
-        active_file = ""
-        open_files: list[str] = []
-        workspace_folders: list[str] = []
-        workspace_file = ""
+        ctx = self._get_editor_context_fast()
+
+        # Populate git branch info from the git manager's cache without
+        # spawning new subprocesses.  get_repo_root / get_current_branch
+        # return cached values when available; skip if the cache is cold
+        # to avoid blocking the UI with ~1s of subprocess calls on large
+        # multi-repo workspaces.
         git_branch = ""
-
-        try:
-            active_file = self.editor_view.get_current_file_path() or ""
-        except Exception:
-            pass
-
-        try:
-            for tab in self.editor_view.tabs.values():
-                if tab.file_path:
-                    open_files.append(tab.file_path)
-        except Exception:
-            pass
-
-        try:
-            workspace_folders = list(self.tree_view.get_workspace_folders() or [])
-        except Exception:
-            pass
-
-        try:
-            from shared.settings import get_setting
-
-            workspace_file = get_setting("workspace.workspace_file", "") or ""
-        except Exception:
-            pass
-
         git_branches: dict[str, str] = {}
         try:
             from shared.git_manager import get_git_manager
 
             git = get_git_manager()
-            # Collect branches for every unique repo in the workspace.
+            workspace_folders = ctx.get("workspace_folders", [])
+            active_file = ctx.get("active_file", "")
+
             seen_roots: set[str] = set()
             targets = list(workspace_folders)
             if active_file:
                 targets.insert(0, active_file)
             for target in targets:
-                repo_root = git.get_repo_root(target)
+                repo_root = git.get_repo_root_cached(target)
                 if repo_root and repo_root not in seen_roots:
                     seen_roots.add(repo_root)
-                    branch = git.get_current_branch(repo_root) or ""
+                    branch = git.get_current_branch_cached(repo_root) or ""
                     if branch:
                         git_branches[os.path.basename(repo_root)] = branch
 
-            # Keep single git_branch for backward compat (active file's repo).
             target = active_file or (workspace_folders[0] if workspace_folders else "")
             if target:
-                git_branch = git.get_current_branch(target) or ""
+                git_branch = git.get_current_branch_cached(target) or ""
         except Exception:
             pass
 
-        return {
-            "active_file": active_file,
-            "open_files": open_files,
-            "workspace_folders": workspace_folders,
-            "workspace_file": workspace_file,
-            "git_branch": git_branch,
-            "git_branches": git_branches,
-        }
+        ctx["git_branch"] = git_branch
+        ctx["git_branches"] = git_branches
+        return ctx
 
     def _update_ide_state_file(self) -> None:
         """Debounced update of ``~/.zen_ide/ide_state.json``.
