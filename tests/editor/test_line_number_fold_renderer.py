@@ -7,7 +7,7 @@ GTK snapshot drawing is not tested here.
 
 from unittest.mock import MagicMock, patch
 
-from editor.line_number_fold_renderer import (
+from editor.line_numbers import (
     _GIT_MARKER_WIDTH,
     _MIN_DIGITS,
     _NUM_PAD,
@@ -60,7 +60,7 @@ class TestLineNumberRendererWidth:
     def _make_renderer(self, line_count=100):
         view, buf = _make_mock_view(line_count=line_count)
         fm = _make_mock_fm()
-        with patch("editor.line_number_fold_renderer.GtkSource"):
+        with patch("editor.line_numbers.line_number_renderer.GtkSource"):
             renderer = LineNumberRenderer.__new__(LineNumberRenderer)
             renderer._view = view
             renderer._fm = fm
@@ -295,7 +295,7 @@ class TestFoldChevronCollapsed:
     """Test that collapsed fold lines skip nested chevrons."""
 
     def test_nested_chevron_skipped(self):
-        from editor.line_number_fold_renderer import FoldChevronRenderer
+        from editor.line_numbers import FoldChevronRenderer
 
         fm = _make_mock_fm(collapsed={5: 15})
         fm._fold_regions = {5: 15, 8: 12}  # nested fold at line 8
@@ -318,7 +318,7 @@ class TestFoldChevronCollapsed:
         snapshot.append_color.assert_not_called()
 
     def test_fold_header_chevron_renders(self):
-        from editor.line_number_fold_renderer import FoldChevronRenderer
+        from editor.line_numbers import FoldChevronRenderer
 
         fm = _make_mock_fm(collapsed={5: 15})
         fm._fold_regions = {5: 15}

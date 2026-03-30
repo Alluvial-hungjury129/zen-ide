@@ -12,7 +12,7 @@ from gi.repository import GLib, Gtk
 from shared.settings import get_setting
 from themes import subscribe_settings_change
 
-from .line_number_fold_renderer import (
+from .line_numbers import (
     BreakpointGutterRenderer,
     FoldChevronRenderer,
     GitDiffGutterRenderer,
