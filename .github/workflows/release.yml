@@ -1,14 +1,57 @@
 name: Release
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      notes_b64:
+        description: "Base64-encoded release notes (injected by make release)"
+        required: true
 
 permissions:
   contents: write
 
 jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Check tag does not exist
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "::error::Tag ${TAG} already exists — bump version in pyproject.toml first"
+            exit 1
+          fi
+
+      - name: Decode release notes
+        run: echo "${{ inputs.notes_b64 }}" | base64 -d > /tmp/release_notes.md
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "Zen IDE ${{ steps.version.outputs.version }}" \
+            --notes-file /tmp/release_notes.md \
+            --target main
+
   build-linux:
+    needs: release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -32,6 +75,7 @@ jobs:
           path: dist/Zen_IDE-*.AppImage
 
   build-macos:
+    needs: release
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -65,7 +109,7 @@ jobs:
 
       - name: Create tar.gz
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ needs.release.outputs.version }}"
           cd dist
           tar -czf "Zen_IDE-${VERSION}-macos.tar.gz" "Zen IDE.app"
 
@@ -76,7 +120,7 @@ jobs:
           path: dist/Zen_IDE-*-macos.tar.gz
 
   upload:
-    needs: [build-linux, build-macos]
+    needs: [release, build-linux, build-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -90,6 +134,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" \
+          gh release upload "${{ needs.release.outputs.tag }}" \
             artifacts/linux-appimage/* \
             artifacts/macos-app/*

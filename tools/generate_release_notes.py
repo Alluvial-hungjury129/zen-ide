@@ -6,6 +6,7 @@ Falls back to a formatted commit list when AI is unavailable.
 """
 
 import json
+import os
 import subprocess
 import sys
 
@@ -35,6 +36,10 @@ def get_commits(since_tag: str) -> str:
 
 
 def get_gh_token() -> str | None:
+    # Prefer GITHUB_TOKEN env var (set in CI), fall back to gh CLI
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        return token
     try:
         r = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=5)
         return r.stdout.strip() if r.returncode == 0 else None
@@ -134,9 +139,9 @@ def main():
         print("No new commits since last tag.", file=sys.stderr)
         sys.exit(1)
 
-    notes = ai_summarize_claude(commits, version, since_tag)
+    notes = ai_summarize_github(commits, version, since_tag)
     if not notes:
-        notes = ai_summarize_github(commits, version, since_tag)
+        notes = ai_summarize_claude(commits, version, since_tag)
     if notes:
         print(notes)
     else:

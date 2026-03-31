@@ -146,15 +146,30 @@ clean: ## Remove build artifacts and caches
 	find . -path ./.venv -prune -o -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	rm -rf .pytest_cache .ruff_cache
 
-release: ## Create a new release with AI-generated notes (requires gh CLI)
+release: ## Generate release notes (AI or manual), confirm, then trigger full CI release
 	@VERSION=$(APP_VERSION); TAG="v$$VERSION"; \
 	echo "Releasing Zen IDE $$VERSION..."; \
 	if git ls-remote --tags origin "refs/tags/$$TAG" 2>/dev/null | grep -q .; then \
 		echo "✗ Tag $$TAG already exists — bump version in pyproject.toml first"; \
 		exit 1; \
 	fi; \
-	echo "Generating release notes with AI..."; \
-	NOTES=$$($(PYTHON) tools/generate_release_notes.py "$$VERSION") || exit 1; \
+	echo ""; \
+	echo "How do you want to write release notes?"; \
+	echo "  1) AI-generated"; \
+	echo "  2) Write manually (opens $$EDITOR)"; \
+	read -p "Choice [1/2]: " CHOICE; \
+	if [ "$$CHOICE" = "2" ]; then \
+		TMPFILE=$$(mktemp /tmp/zen_release_XXXXXX.md); \
+		echo "# Release notes for $$TAG" > "$$TMPFILE"; \
+		echo "" >> "$$TMPFILE"; \
+		$${EDITOR:-vi} "$$TMPFILE"; \
+		NOTES=$$(cat "$$TMPFILE"); \
+		rm -f "$$TMPFILE"; \
+		if [ -z "$$NOTES" ]; then echo "✗ Empty notes — aborting."; exit 1; fi; \
+	else \
+		echo "Generating release notes with AI..."; \
+		NOTES=$$($(PYTHON) tools/generate_release_notes.py "$$VERSION") || exit 1; \
+	fi; \
 	echo ""; \
 	echo "┌── Release Notes ($$TAG) ──"; \
 	echo "$$NOTES" | sed 's/^/│ /'; \
@@ -162,14 +177,10 @@ release: ## Create a new release with AI-generated notes (requires gh CLI)
 	echo ""; \
 	read -p "Create release $$TAG with these notes? [y/N] " CONFIRM; \
 	if [ "$$CONFIRM" = "y" ] || [ "$$CONFIRM" = "Y" ]; then \
-		echo "$$NOTES" > /tmp/zen_release_notes.md; \
-		gh release create "$$TAG" \
-			--title "Zen IDE $$VERSION" \
-			--notes-file /tmp/zen_release_notes.md \
-			--target main; \
-		rm -f /tmp/zen_release_notes.md; \
-		echo "✓ Release created — CI will build and attach artifacts"; \
-		echo "  View: $$(gh browse -n)/releases/tag/$$TAG"; \
+		NOTES_B64=$$(echo "$$NOTES" | base64 -w 0 2>/dev/null || echo "$$NOTES" | base64 2>/dev/null); \
+		gh workflow run release.yml --ref main -f "notes_b64=$$NOTES_B64"; \
+		echo "✓ Release workflow dispatched"; \
+		echo "  Watch: $$(gh browse -n)/actions/workflows/release.yml"; \
 	else \
 		echo "Cancelled."; \
 	fi
