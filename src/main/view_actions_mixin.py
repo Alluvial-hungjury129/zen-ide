@@ -205,7 +205,7 @@ class ViewActionsMixin:
 
     def _on_debug_start(self, action, param):
         """Start or continue debugging (F5)."""
-        from debugger.debug_session import DebugSession, SessionState
+        from debugger.debug_session import SessionState
 
         session = getattr(self, "_debug_session", None)
         if session and session.state == SessionState.STOPPED:
@@ -240,6 +240,48 @@ class ViewActionsMixin:
                     "error",
                 )
                 return
+
+        self._launch_debug_session(config, file_path, workspace)
+
+    def _on_debug_test(self, file_path: str, python: str = ""):
+        """Show test selector in debug panel (triggered from treeview)."""
+        from debugger.debug_session import SessionState
+
+        # Stop any running session
+        session = getattr(self, "_debug_session", None)
+        if session and session.state not in (SessionState.TERMINATED, SessionState.IDLE):
+            session.stop()
+            self._clear_debug_decorations()
+        self._debug_session = None
+
+        # Show debug panel with test selector
+        self.split_panels.show("debug")
+        self.debug_panel.show_test_selector(file_path, python)
+
+    def _launch_debug_test_selection(self, file_path: str, python: str, selected_tests: list):
+        """Start a debug session with only the selected tests."""
+        from debugger.debug_config import create_test_debug_config
+
+        workspace_folders = self.tree_view.get_workspace_folders()
+        workspace = workspace_folders[0] if workspace_folders else os.path.dirname(file_path)
+
+        config = create_test_debug_config(file_path, python=python, workspace_folders=workspace_folders)
+        if not config:
+            self.debug_panel.append_output(
+                f"Cannot debug tests: unsupported file type ({os.path.splitext(file_path)[1]})\n",
+                "error",
+            )
+            return
+
+        # Build pytest node IDs: file::Class::method or file::function
+        node_ids = [f"{file_path}::{t.node_id}" for t in selected_tests]
+        config.args = node_ids + ["-s"]
+
+        self._launch_debug_session(config, file_path, workspace)
+
+    def _launch_debug_session(self, config, file_path: str, workspace: str):
+        """Create and start a debug session with the given config."""
+        from debugger.debug_session import DebugSession
 
         # Show debug panel
         self.split_panels.show("debug")

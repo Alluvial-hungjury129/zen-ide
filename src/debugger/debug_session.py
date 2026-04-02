@@ -126,6 +126,7 @@ class DebugSession:
         try:
             self._client.start(
                 script_path=program,
+                module=self._config.module if self._config.type == "python" else "",
                 python=python,
                 cwd=cwd,
                 env=self._config.env or None,

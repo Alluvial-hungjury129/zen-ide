@@ -121,6 +121,7 @@ class WindowLayoutMixin(LayoutCssMixin, LayoutDndMixin):
                 color: inherit;
                 padding: 0;
                 min-height: {tab_btn_height}px;
+                min-width: 0;
                 margin: 0;
                 border: none;
                 border-bottom: none;

@@ -63,6 +63,8 @@ class TreeViewActionsMixin(TreeClipboardMixin):
             items.append({"label": "---"})
             test_label = "Run Test" if len(selection) == 1 else f"Run {len(selection)} Tests"
             items.append({"label": test_label, "action": "run_test", "icon": IconsManager.WRENCH})
+            if len(selection) == 1:
+                items.append({"label": "Debug Test", "action": "debug_test", "icon": IconsManager.BUG})
 
         # Git actions - only show for modified files
         if can_discard:
@@ -95,6 +97,8 @@ class TreeViewActionsMixin(TreeClipboardMixin):
                 self._action_open_in_browser(item)
             elif action == "run_test":
                 self._action_run_test(item)
+            elif action == "debug_test":
+                self._action_debug_test(item)
 
         parent = self.get_root()
         show_context_menu(parent, items, on_select, x, y, source_widget=self.tree.drawing_area)
@@ -472,3 +476,15 @@ class TreeViewActionsMixin(TreeClipboardMixin):
         if self.write_to_terminal:
             commands = [self._get_test_command(selected) for selected in self._get_action_items(item)]
             self.write_to_terminal("\n".join(commands))
+
+    def _action_debug_test(self, item):
+        """Run test file under the debugger, stopping at breakpoints."""
+        if not self.on_debug_test:
+            return
+        selection = self._get_action_items(item)
+        selected = selection[0] if selection else item
+        if not selected or selected.is_dir:
+            return
+        file_path = str(selected.path)
+        python = self._find_venv_python(file_path) if file_path.endswith(".py") else ""
+        self.on_debug_test(file_path, python)

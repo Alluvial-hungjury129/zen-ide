@@ -101,6 +101,9 @@ class StartupOptimizerMixin:
             else None
         )
 
+        # Wire tree view → debugger for "Debug Test" action
+        self.tree_view.on_debug_test = self._on_debug_test
+
         self.bottom_paned.set_end_child(self.terminal_view)
 
         # Setup terminal focus tracking (was skipped in _setup_focus_tracking since placeholder had no .terminal)

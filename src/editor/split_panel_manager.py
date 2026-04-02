@@ -58,6 +58,11 @@ class SplitPanelManager:
         """Check if a specific panel is currently active."""
         return self._active == name
 
+    @property
+    def is_active(self) -> bool:
+        """Check if any panel is currently active."""
+        return self._active is not None
+
     # -- Common helpers for end_child split panels --
 
     def swap_end_child(self, widget: Gtk.Widget):

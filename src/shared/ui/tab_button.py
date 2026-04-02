@@ -35,6 +35,7 @@ class TabButton(Gtk.Box):
     def _build_ui(self):
         """Build the tab button UI."""
         self.set_size_request(-1, TAB_BUTTON_HEIGHT)
+        self.set_halign(Gtk.Align.START)
         self.set_margin_start(4)
         self.set_margin_end(4)
         self.set_margin_top(2)

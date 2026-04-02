@@ -39,6 +39,7 @@ class BdbClient:
     def start(
         self,
         script_path: str,
+        module: str = "",
         python: str = "",
         cwd: str = "",
         env: dict[str, str] | None = None,
@@ -46,9 +47,14 @@ class BdbClient:
     ) -> None:
         """Launch the debugger subprocess."""
         python = python or sys.executable
-        cmd = [python, "-u", _BRIDGE_SCRIPT, script_path]
-        if args:
-            cmd.extend(args)
+        if module:
+            cmd = [python, "-u", _BRIDGE_SCRIPT, "--module", module]
+            if args:
+                cmd.extend(args)
+        else:
+            cmd = [python, "-u", _BRIDGE_SCRIPT, script_path]
+            if args:
+                cmd.extend(args)
 
         proc_env = os.environ.copy()
         if env:
@@ -79,6 +85,13 @@ class BdbClient:
                     self._process.kill()
                 except OSError:
                     pass
+            # Close pipes explicitly to avoid BrokenPipeError during GC
+            for pipe in (self._process.stdin, self._process.stdout, self._process.stderr):
+                if pipe:
+                    try:
+                        pipe.close()
+                    except OSError:
+                        pass
             self._process = None
         with self._lock:
             for fut in self._pending.values():
@@ -246,10 +259,20 @@ def _run_debuggee():
     import traceback
 
     if len(sys.argv) < 2:
-        sys.exit("Usage: python bdb_debugger.py <script> [args...]")
+        sys.exit("Usage: python bdb_debugger.py [--module <module>] <script> [args...]")
 
-    script = os.path.abspath(sys.argv[1])
-    sys.argv = sys.argv[1:]  # Adjust argv for the debuggee
+    # Detect --module mode: `bdb_debugger.py --module pytest test_file.py -s`
+    module_mode = False
+    module_name = ""
+    if sys.argv[1] == "--module":
+        module_mode = True
+        if len(sys.argv) < 3:
+            sys.exit("Usage: python bdb_debugger.py --module <module> [args...]")
+        module_name = sys.argv[2]
+        sys.argv = sys.argv[2:]  # argv[0]=module_name, argv[1:]=module args
+    else:
+        script = os.path.abspath(sys.argv[1])
+        sys.argv = sys.argv[1:]  # Adjust argv for the debuggee
 
     # Save real stdio before redirecting
     real_stdin = sys.stdin
@@ -293,24 +316,44 @@ def _run_debuggee():
 
     dbg._stop_on_entry = stop_on_entry
 
-    # Add script directory to path
-    script_dir = os.path.dirname(script)
-    if script_dir not in sys.path:
-        sys.path.insert(0, script_dir)
-
-    # Run the script
     exit_code = 0
     try:
-        with open(script) as f:
-            code = compile(f.read(), script, "exec")
+        if module_mode:
+            # Module mode: run `python -m <module>` under bdb tracing.
+            # Ensure cwd is on sys.path so test imports resolve.
+            cwd = os.getcwd()
+            if cwd not in sys.path:
+                sys.path.insert(0, cwd)
 
-        globs = {
-            "__name__": "__main__",
-            "__file__": script,
-            "__builtins__": __builtins__,
-        }
+            import runpy
 
-        dbg.run(code, globs)
+            code = compile(
+                "runpy.run_module(module_name, run_name='__main__', alter_sys=True)",
+                f"<module {module_name}>",
+                "exec",
+            )
+            globs = {
+                "__name__": "__main__",
+                "__builtins__": __builtins__,
+                "runpy": runpy,
+                "module_name": module_name,
+            }
+            dbg.run(code, globs)
+        else:
+            # Script mode: compile and run a .py file
+            script_dir = os.path.dirname(script)
+            if script_dir not in sys.path:
+                sys.path.insert(0, script_dir)
+
+            with open(script) as f:
+                code = compile(f.read(), script, "exec")
+
+            globs = {
+                "__name__": "__main__",
+                "__file__": script,
+                "__builtins__": __builtins__,
+            }
+            dbg.run(code, globs)
 
     except bdb.BdbQuit:
         pass

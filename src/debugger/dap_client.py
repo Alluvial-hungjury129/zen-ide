@@ -41,6 +41,7 @@ class DapClient:
     def start(
         self,
         script_path: str,
+        module: str = "",
         python: str = "",
         cwd: str = "",
         env: dict[str, str] | None = None,

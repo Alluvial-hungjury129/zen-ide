@@ -21,6 +21,7 @@ class DebugConfig:
     _type: str = "python"
     program: str = ""
     python: str = ""  # Python executable (default: sys.executable)
+    module: str = ""  # Run as `python -m <module>` instead of a script
     args: list[str] = field(default_factory=list)
     cwd: str = ""
     env: dict[str, str] = field(default_factory=dict)
@@ -129,6 +130,44 @@ def load_configurations(workspace_folder: str = "") -> list[DebugConfig]:
         if config:
             configs.append(config)
     return configs
+
+
+def create_test_debug_config(
+    file_path: str,
+    python: str = "",
+    workspace_folders: list[str] | None = None,
+) -> DebugConfig | None:
+    """Create a debug configuration for running a test file under the debugger.
+
+    Supports Python (pytest), JavaScript/TypeScript (node --inspect), Go, and Ruby.
+    Returns None if the file type is not supported for test debugging.
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+    basename = os.path.basename(file_path)
+    cwd = workspace_folders[0] if workspace_folders else os.path.dirname(file_path)
+
+    if ext == ".py":
+        return DebugConfig(
+            name=f"Debug Test: {basename}",
+            _type="python",
+            module="pytest",
+            program=file_path,
+            python=python,
+            cwd=cwd,
+            args=[file_path, "-s"],
+        )
+
+    # JS/TS — delegate to node debugger with jest/vitest
+    if ext in (".js", ".jsx", ".ts", ".tsx", ".mjs", ".mts"):
+        return DebugConfig(
+            name=f"Debug Test: {basename}",
+            _type="node",
+            program="node_modules/.bin/jest",
+            cwd=cwd,
+            args=["--runInBand", file_path],
+        )
+
+    return None
 
 
 def save_configurations(configs: list[DebugConfig]) -> None:

@@ -307,6 +307,11 @@ class DebugPanel(Gtk.Box):
         self._breakpoint_mgr = get_breakpoint_manager()
         self.add_css_class("debug-panel")
 
+        # Focus tracking — treat debug panel as "editor" for maximize purposes
+        focus_ctrl = Gtk.EventControllerFocus()
+        focus_ctrl.connect("enter", self._on_focus_enter)
+        self.add_controller(focus_ctrl)
+
         theme = get_theme()
         from fonts import get_font_settings
 
@@ -324,6 +329,56 @@ class DebugPanel(Gtk.Box):
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         content_box.set_vexpand(True)
         self.append(content_box)
+
+        # Tests section (shown when debugging tests)
+        self._tests_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self._tests_section.set_visible(False)
+        content_box.append(self._tests_section)
+
+        tests_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        tests_header.set_margin_start(8)
+        tests_header.set_margin_end(8)
+        tests_header.set_margin_top(4)
+        tests_header.set_margin_bottom(2)
+        tests_label = Gtk.Label(label="TESTS")
+        tests_label.set_halign(Gtk.Align.START)
+        tests_label.set_hexpand(True)
+        tests_label.add_css_class("dim-label")
+        tests_label.set_attributes(self._font_attrs)
+        tests_header.append(tests_label)
+
+        self._select_all_btn = ZenButton(label="All", tooltip="Select all tests")
+        self._select_all_btn.add_css_class("flat")
+        self._select_all_btn.connect("clicked", self._on_select_all_tests)
+        tests_header.append(self._select_all_btn)
+
+        self._select_none_btn = ZenButton(label="None", tooltip="Deselect all tests")
+        self._select_none_btn.add_css_class("flat")
+        self._select_none_btn.connect("clicked", self._on_select_none_tests)
+        tests_header.append(self._select_none_btn)
+
+        self._run_tests_btn = ZenButton(icon=IconsManager.BUG, tooltip="Debug selected tests")
+        self._run_tests_btn.add_css_class("debug-toolbar-btn")
+        self._run_tests_btn.connect("clicked", self._on_run_selected_tests)
+        tests_header.append(self._run_tests_btn)
+
+        self._tests_section.append(tests_header)
+
+        tests_scroll = Gtk.ScrolledWindow()
+        tests_scroll.set_vexpand(True)
+        tests_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        tests_scroll.set_max_content_height(200)
+        tests_scroll.set_propagate_natural_height(True)
+        self._tests_section.append(tests_scroll)
+
+        self._tests_list = Gtk.ListBox()
+        self._tests_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._tests_list.add_css_class("debug-tests-list")
+        tests_scroll.set_child(self._tests_list)
+
+        self._pending_test_file: str = ""
+        self._pending_test_python: str = ""
+        self._test_checks: list[tuple] = []  # [(Gtk.CheckButton, DiscoveredTest), ...]
 
         # Call stack section
         content_box.append(self._create_section_label("CALL STACK"))
@@ -636,6 +691,93 @@ class DebugPanel(Gtk.Box):
         # Navigate to stopped location
         if file_path and os.path.isfile(file_path):
             self._window.editor_view.open_file(file_path, line)
+
+    def _on_focus_enter(self, controller):
+        """When debug panel gains focus, register as editor for maximize."""
+        from shared.focus_manager import get_focus_manager
+
+        self._window._focused_panel = "editor"
+        get_focus_manager().set_focus("editor")
+
+    # -- Test selector --
+
+    def show_test_selector(self, file_path: str, python: str = "") -> None:
+        """Populate the test selector with discovered tests and show the section."""
+        from .test_discovery import discover_tests
+
+        self._pending_test_file = file_path
+        self._pending_test_python = python
+        self._test_checks.clear()
+
+        # Clear existing rows
+        while True:
+            row = self._tests_list.get_row_at_index(0)
+            if row is None:
+                break
+            self._tests_list.remove(row)
+
+        tests = discover_tests(file_path)
+        if not tests:
+            self.append_output(f"No test functions found in {os.path.basename(file_path)}\n", "error")
+            self._tests_section.set_visible(False)
+            return
+
+        for test_item in tests:
+            row = Gtk.ListBoxRow()
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            box.set_margin_start(8)
+            box.set_margin_end(4)
+            box.set_margin_top(1)
+            box.set_margin_bottom(1)
+
+            check = Gtk.CheckButton()
+            check.set_active(True)
+            box.append(check)
+
+            label = Gtk.Label(label=test_item.display_name)
+            label.set_halign(Gtk.Align.START)
+            label.set_hexpand(True)
+            label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+            label.set_attributes(self._font_attrs)
+            box.append(label)
+
+            # Click label to navigate to test
+            gesture = Gtk.GestureClick()
+            gesture.connect("pressed", self._on_test_item_clicked, test_item)
+            row.add_controller(gesture)
+
+            row.set_child(box)
+            self._tests_list.append(row)
+            self._test_checks.append((check, test_item))
+
+        self._tests_section.set_visible(True)
+
+    def _on_select_all_tests(self, btn):
+        for check, _ in self._test_checks:
+            check.set_active(True)
+
+    def _on_select_none_tests(self, btn):
+        for check, _ in self._test_checks:
+            check.set_active(False)
+
+    def _on_run_selected_tests(self, btn):
+        """Launch debug session with only the selected tests."""
+        selected = [item for check, item in self._test_checks if check.get_active()]
+        if not selected:
+            self.append_output("No tests selected\n", "error")
+            return
+
+        if self._window and hasattr(self._window, "_launch_debug_test_selection"):
+            self._window._launch_debug_test_selection(
+                self._pending_test_file,
+                self._pending_test_python,
+                selected,
+            )
+
+    def _on_test_item_clicked(self, gesture, n_press, x, y, test_item) -> None:
+        """Navigate to the test function in the editor."""
+        if n_press == 1 and self._pending_test_file and os.path.isfile(self._pending_test_file):
+            self._window.editor_view.open_file(self._pending_test_file, test_item.line)
 
     # -- Helpers --
 

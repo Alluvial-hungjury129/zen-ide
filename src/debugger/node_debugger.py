@@ -61,6 +61,7 @@ class NodeClient:
     def start(
         self,
         script_path: str,
+        module: str = "",  # unused, kept for interface compat
         python: str = "",  # unused, kept for interface compat
         cwd: str = "",
         env: dict[str, str] | None = None,

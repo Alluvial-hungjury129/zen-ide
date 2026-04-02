@@ -47,6 +47,7 @@ class TreeView(ThemeAwareMixin, TreeViewActionsMixin, FocusBorderMixin, Gtk.Box)
 
         # Callbacks for context menu actions
         self.write_to_terminal: Optional[Callable[[str], None]] = None
+        self.on_debug_test: Optional[Callable[[str, str], None]] = None
         self.on_show_diff: Optional[Callable[[str], None]] = None
         self.on_git_refresh: Optional[Callable[[], None]] = None
 

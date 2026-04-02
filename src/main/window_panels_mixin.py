@@ -48,6 +48,11 @@ class WindowPanelsMixin:
         """Show a widget as a 50% split end_child panel."""
         self.split_panels.swap_end_child(widget)
         widget.show_panel()
+
+        # When editor is maximized, restore shrink so the panel gets space
+        if self._maximized_panel == "editor" and self.editor_split_paned:
+            self.editor_split_paned.set_shrink_end_child(False)
+
         GLib.idle_add(self.split_panels.set_half_position)
 
         # Ensure editor area gets enough vertical space for the panel
@@ -60,6 +65,10 @@ class WindowPanelsMixin:
         """Hide an end_child panel and restore full editor width."""
         widget.hide_panel()
         self.split_panels.restore_full_position()
+
+        # Re-enable shrink suppression when editor is maximized
+        if self._maximized_panel == "editor" and self.editor_split_paned:
+            self.editor_split_paned.set_shrink_end_child(True)
 
         # If no editor tabs remain, collapse editor so terminals auto-expand
         if not self.editor_view.tabs and not self._has_welcome_screen() and not self._has_dev_pad_tab():
@@ -141,9 +150,13 @@ class WindowPanelsMixin:
             if panel_name == "editor":
                 animate_paned(self.main_paned, 0)
                 animate_paned(self.right_paned, w, on_done=self._sync_terminal_resize)
+                # Keep split panel visible alongside editor when maximized
                 if self.editor_split_paned:
                     self.editor_split_paned.set_shrink_end_child(True)
-                    animate_paned(self.editor_split_paned, w)
+                    if self.split_panels and self.split_panels.is_active:
+                        GLib.idle_add(self.split_panels.set_half_position)
+                    else:
+                        animate_paned(self.editor_split_paned, w)
             elif panel_name == "terminal":
                 animate_paned(self.main_paned, 0)
                 animate_paned(self.right_paned, 0)
